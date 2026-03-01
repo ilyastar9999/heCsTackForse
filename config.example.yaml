@@ -16,6 +16,7 @@ ctf:
   scoring: static     # static | dynamic
   flag_prefix: "FLAG{"
   flag_suffix: "}"
+  seed_challenges: true  # insert built-in sample tasks on first run (skipped if challenges already exist)
 
 deployer:
   instance_ttl: 4h

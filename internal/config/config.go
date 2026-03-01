@@ -34,6 +34,7 @@ type CTFConfig struct {
 	Scoring          string `yaml:"scoring"`
 	FlagPrefix       string `yaml:"flag_prefix"`
 	FlagSuffix       string `yaml:"flag_suffix"`
+	SeedChallenges   bool   `yaml:"seed_challenges"`
 }
 
 type DeployerConfig struct {
@@ -89,6 +90,7 @@ func Load(path string) (*Config, error) {
 	cfg.CTF.Scoring = "static"
 	cfg.CTF.FlagPrefix = "FLAG{"
 	cfg.CTF.FlagSuffix = "}"
+	cfg.CTF.SeedChallenges = true
 	cfg.Deployer.InstanceTTL = "4h"
 	cfg.AD.RoundDuration = "5m"
 	cfg.AD.FlagLifetime = 2

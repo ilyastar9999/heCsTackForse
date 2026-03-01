@@ -33,6 +33,12 @@ func main() {
 	}
 	defer database.Close()
 
+	if cfg.CTF.SeedChallenges {
+		if err := database.Seed(); err != nil {
+			log.Printf("warning: challenge seeding failed: %v", err)
+		}
+	}
+
 	mgr := deployer.NewManager()
 	mgr.Register(&deployer.NoopDeployer{})
 	mgr.Register(&deployer.NoDeployDeployer{})
