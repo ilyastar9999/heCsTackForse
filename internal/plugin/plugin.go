@@ -45,22 +45,33 @@ type DynamicScorer struct {
 	Decay     float64
 }
 
-func (d *DynamicScorer) Name() string                { return "dynamic" }
-func (d *DynamicScorer) Init(_ map[string]any) error { return nil }
-func (d *DynamicScorer) CalculateScore(challenge *models.Challenge, solveCount int) int {
-	if d.MaxPoints == 0 {
-		d.MaxPoints = challenge.Points
-	}
+func (d *DynamicScorer) Name() string { return "dynamic" }
+func (d *DynamicScorer) Init(_ map[string]any) error {
 	if d.MinPoints == 0 {
 		d.MinPoints = 50
 	}
 	if d.Decay == 0 {
 		d.Decay = 0.05
 	}
+	return nil
+}
+func (d *DynamicScorer) CalculateScore(challenge *models.Challenge, solveCount int) int {
+	maxPts := d.MaxPoints
+	if maxPts == 0 {
+		maxPts = challenge.Points
+	}
+	minPts := d.MinPoints
+	if minPts == 0 {
+		minPts = 50
+	}
+	decay := d.Decay
+	if decay == 0 {
+		decay = 0.05
+	}
 	// Exponential decay: score approaches MinPoints as solveCount grows.
-	score := float64(d.MinPoints) + float64(d.MaxPoints-d.MinPoints)*math.Exp(-d.Decay*float64(solveCount))
-	if score < float64(d.MinPoints) {
-		score = float64(d.MinPoints)
+	score := float64(minPts) + float64(maxPts-minPts)*math.Exp(-decay*float64(solveCount))
+	if score < float64(minPts) {
+		score = float64(minPts)
 	}
 	return int(score)
 }

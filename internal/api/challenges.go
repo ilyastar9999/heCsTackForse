@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+	"regexp"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
@@ -105,8 +106,13 @@ func (s *Server) handleSubmitFlag(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ip := r.RemoteAddr
-	// TODO: support regex flag_type matching when flagType == "regex"
-	isCorrect := req.Flag == correctFlag
+	var isCorrect bool
+	if flagType == "regex" {
+		re, err := regexp.Compile(correctFlag)
+		isCorrect = err == nil && re.MatchString(req.Flag)
+	} else {
+		isCorrect = req.Flag == correctFlag
+	}
 	isCorrectInt := 0
 	if isCorrect {
 		isCorrectInt = 1
