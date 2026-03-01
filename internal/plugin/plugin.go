@@ -26,6 +26,8 @@ type Notifier interface {
 	Notify(event Event) error
 }
 
+// StaticScorer returns a fixed point value for challenges regardless of solve count.
+// It simply returns the challenge's configured Points field.
 type StaticScorer struct{}
 
 func (s *StaticScorer) Name() string                { return "static" }
@@ -34,6 +36,9 @@ func (s *StaticScorer) CalculateScore(challenge *models.Challenge, _ int) int {
 	return challenge.Points
 }
 
+// DynamicScorer adjusts challenge points using an exponential decay formula based on solve count.
+// Points decrease from MaxPoints toward MinPoints as more teams solve the challenge,
+// following: score = MinPoints + (MaxPoints - MinPoints) * exp(-Decay * solveCount).
 type DynamicScorer struct {
 	MinPoints int
 	MaxPoints int
