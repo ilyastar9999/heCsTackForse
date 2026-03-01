@@ -21,7 +21,7 @@ type PVEDeployer struct {
 	client      *http.Client
 }
 
-func NewPVEDeployer(url, tokenID, tokenSecret, node string, vmTemplate int) *PVEDeployer {
+func NewPVEDeployer(url, tokenID, tokenSecret, node string, vmTemplate int, insecureSkipVerify bool) *PVEDeployer {
 	return &PVEDeployer{
 		URL:         url,
 		TokenID:     tokenID,
@@ -31,9 +31,9 @@ func NewPVEDeployer(url, tokenID, tokenSecret, node string, vmTemplate int) *PVE
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 			Transport: &http.Transport{
-				// Proxmox VE commonly uses self-signed certificates.
-				// Certificate verification is intentionally disabled for PVE API calls.
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
+				// InsecureSkipVerify is user-controlled via config (insecure_skip_verify).
+				// Only enable when the PVE server uses a self-signed certificate.
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: insecureSkipVerify}, //nolint:gosec
 			},
 		},
 	}

@@ -35,6 +35,7 @@ deployer:
       token_secret: secret
       node: pve
       vm_template: 100
+      insecure_skip_verify: false  # set true only if PVE uses a self-signed certificate
 
 ad:
   round_duration: 5m

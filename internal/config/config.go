@@ -60,12 +60,13 @@ type KubernetesConfig struct {
 }
 
 type PVEConfig struct {
-	Enabled     bool   `yaml:"enabled"`
-	URL         string `yaml:"url"`
-	TokenID     string `yaml:"token_id"`
-	TokenSecret string `yaml:"token_secret"`
-	Node        string `yaml:"node"`
-	VMTemplate  int    `yaml:"vm_template"`
+	Enabled            bool   `yaml:"enabled"`
+	URL                string `yaml:"url"`
+	TokenID            string `yaml:"token_id"`
+	TokenSecret        string `yaml:"token_secret"`
+	Node               string `yaml:"node"`
+	VMTemplate         int    `yaml:"vm_template"`
+	InsecureSkipVerify bool   `yaml:"insecure_skip_verify"` // set true only if PVE uses a self-signed cert
 }
 
 type ADConfig struct {

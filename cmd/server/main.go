@@ -58,6 +58,7 @@ func main() {
 			cfg.Deployer.Backends.PVE.TokenSecret,
 			cfg.Deployer.Backends.PVE.Node,
 			cfg.Deployer.Backends.PVE.VMTemplate,
+			cfg.Deployer.Backends.PVE.InsecureSkipVerify,
 		))
 	}
 

@@ -15,7 +15,8 @@ func New(dsn string) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	sqlDB.SetMaxOpenConns(1)
+	// SQLite supports concurrent reads; limit writers to 1 to avoid SQLITE_BUSY.
+	sqlDB.SetMaxOpenConns(10)
 	if err := sqlDB.Ping(); err != nil {
 		return nil, err
 	}

@@ -105,6 +105,7 @@ func (s *Server) handleSubmitFlag(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ip := r.RemoteAddr
+	// TODO: support regex flag_type matching when flagType == "regex"
 	isCorrect := req.Flag == correctFlag
 	isCorrectInt := 0
 	if isCorrect {

@@ -14,14 +14,15 @@ import (
 )
 
 type Server struct {
-	cfg      *config.Config
-	db       *db.DB
-	deployer *deployer.Manager
-	r        *chi.Mux
+	cfg         *config.Config
+	db          *db.DB
+	deployer    *deployer.Manager
+	r           *chi.Mux
+	rateLimiter *rateLimiter
 }
 
 func NewServer(cfg *config.Config, database *db.DB, mgr *deployer.Manager) *Server {
-	s := &Server{cfg: cfg, db: database, deployer: mgr}
+	s := &Server{cfg: cfg, db: database, deployer: mgr, rateLimiter: newRateLimiter()}
 	s.r = s.buildRouter()
 	return s
 }
