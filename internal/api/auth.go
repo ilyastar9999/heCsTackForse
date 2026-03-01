@@ -99,7 +99,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   r.TLS != nil,
 		SameSite: http.SameSiteLaxMode,
 	})
 	jsonResponse(w, http.StatusOK, map[string]any{
@@ -129,7 +129,7 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   r.TLS != nil,
 	})
 	jsonResponse(w, http.StatusOK, map[string]string{"message": "logged out"})
 }

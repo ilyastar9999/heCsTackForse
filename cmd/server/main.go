@@ -61,8 +61,6 @@ func main() {
 		))
 	}
 
-	_ = mgr
-
 	srv := api.NewServer(cfg, database, mgr)
 
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)

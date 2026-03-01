@@ -31,6 +31,8 @@ func NewPVEDeployer(url, tokenID, tokenSecret, node string, vmTemplate int) *PVE
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 			Transport: &http.Transport{
+				// Proxmox VE commonly uses self-signed certificates.
+				// Certificate verification is intentionally disabled for PVE API calls.
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
 			},
 		},
