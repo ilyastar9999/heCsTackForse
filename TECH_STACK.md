@@ -9,6 +9,7 @@
 | Auth | [golang-jwt/jwt v5](https://github.com/golang-jwt/jwt) | JWT tokens stored in HttpOnly cookies |
 | Passwords | [golang.org/x/crypto (bcrypt)](https://pkg.go.dev/golang.org/x/crypto/bcrypt) | Industry-standard password hashing |
 | Database | [modernc.org/sqlite](https://gitlab.com/cznic/sqlite) | Pure-Go SQLite — zero CGO, single binary |
+| Database | [lib/pq](https://github.com/lib/pq) | PostgreSQL driver — production-grade, used via `database/sql` |
 | Config | [gopkg.in/yaml.v3](https://pkg.go.dev/gopkg.in/yaml.v3) | YAML configuration files |
 
 ## Frontend
@@ -18,6 +19,14 @@
 | UI | Vanilla HTML5 / CSS3 / JavaScript | Zero build-step, no framework dependencies |
 | HTTP | `fetch()` API | Built-in browser API for REST calls |
 | Theme | Custom dark theme | CTF-style dark UI in pure CSS |
+
+## Deployment
+
+| Tool | Purpose |
+|------|---------|
+| [Docker](https://docs.docker.com/) | Containerise the application (multi-stage Alpine build) |
+| [Docker Compose](https://docs.docker.com/compose/) | One-command local/server spin-up (`compose.yaml`) |
+| [PostgreSQL 16](https://www.postgresql.org/) | Production database (default in compose) |
 
 ## Deployment Backends
 
@@ -86,6 +95,28 @@ All persistent state lives in a single SQLite database file (default: `./ctf.db`
 
 ## Running
 
+### Docker Compose (recommended)
+
+```bash
+# 1. Edit the config (change secret_key at minimum)
+#    docker/config.yaml is already wired to PostgreSQL inside compose
+nano docker/config.yaml
+
+# 2. Start everything (builds the image, starts PostgreSQL, then the app)
+docker compose up -d
+
+# 3. Open http://localhost:8080
+#    First registered user is automatically made admin.
+
+# Logs
+docker compose logs -f app
+
+# Stop
+docker compose down
+```
+
+### Local (SQLite, no Docker)
+
 ```bash
 # Copy example config
 cp config.example.yaml config.yaml
@@ -96,4 +127,18 @@ go run ./cmd/server config.yaml
 # Or build a binary:
 go build -o heCsTackForse ./cmd/server
 ./heCsTackForse config.yaml
+```
+
+### PostgreSQL without Docker
+
+```bash
+# Create database
+createdb ctf
+
+# In config.yaml:
+# database:
+#   driver: postgres
+#   dsn: "postgres://user:pass@localhost:5432/ctf?sslmode=disable"
+
+go run ./cmd/server config.yaml
 ```

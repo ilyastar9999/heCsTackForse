@@ -1,0 +1,38 @@
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ctf
+      POSTGRES_PASSWORD: ctf
+      POSTGRES_DB: ctf
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ctf -d ctf"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── CTF platform ────────────────────────────────────────────────────────────
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      # Config file — edit docker/config.yaml before first run
+      - ./docker/config.yaml:/app/config.yaml:ro
+      # Writable volume for A&D sploit temp files
+      - sploits:/tmp/sploits
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      TZ: UTC
+
+volumes:
+  postgres_data:
+  sploits:

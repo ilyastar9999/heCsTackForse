@@ -107,7 +107,7 @@ func (e *Engine) runRound(round int64) {
 
 	// Record round start
 	_, _ = e.db.Exec(
-		`INSERT OR IGNORE INTO ad_rounds (round, started_at) VALUES (?, ?)`,
+		e.db.InsertIgnore(`INSERT INTO ad_rounds (round, started_at) VALUES (?, ?)`),
 		round, start,
 	)
 
@@ -290,7 +290,7 @@ func (e *Engine) runSploits(round int64) {
 	// Fetch enabled sploits
 	sploitRows, err := e.db.Query(`
 		SELECT id, team_id, challenge_id, language, script
-		FROM ad_sploits WHERE enabled=1
+		FROM ad_sploits WHERE enabled
 	`)
 	if err != nil {
 		log.Printf("ad: runSploits query error: %v", err)

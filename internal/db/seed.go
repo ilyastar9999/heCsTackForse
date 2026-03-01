@@ -285,7 +285,7 @@ func (d *DB) Seed() error {
 		INSERT INTO challenges
 			(name, description, category, points, flag, flag_type, deploy_type, deploy_backend, deploy_config, is_visible)
 		VALUES
-			(?, ?, ?, ?, ?, ?, ?, '', '{}', 1)
+			(?, ?, ?, ?, ?, ?, ?, '', '{}', TRUE)
 	`)
 	if err != nil {
 		return err

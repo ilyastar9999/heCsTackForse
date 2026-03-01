@@ -51,12 +51,11 @@ func (s *Server) handleCreateTeam(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	result, err := s.db.Exec("INSERT INTO teams (name, invite_code) VALUES (?, ?)", req.Name, inviteCode)
+	teamID, err := s.db.InsertGetID("INSERT INTO teams (name, invite_code) VALUES (?, ?)", req.Name, inviteCode)
 	if err != nil {
 		jsonError(w, "team name already exists", http.StatusConflict)
 		return
 	}
-	teamID, _ := result.LastInsertId()
 	_, err = s.db.Exec("INSERT INTO team_members (user_id, team_id) VALUES (?, ?)", userID, teamID)
 	if err != nil {
 		jsonError(w, "db error", http.StatusInternalServerError)
@@ -85,7 +84,7 @@ func (s *Server) handleJoinTeam(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "db error", http.StatusInternalServerError)
 		return
 	}
-	_, err = s.db.Exec("INSERT OR IGNORE INTO team_members (user_id, team_id) VALUES (?, ?)", userID, team.ID)
+	_, err = s.db.Exec(s.db.InsertIgnore("INSERT INTO team_members (user_id, team_id) VALUES (?, ?)"), userID, team.ID)
 	if err != nil {
 		jsonError(w, "db error", http.StatusInternalServerError)
 		return

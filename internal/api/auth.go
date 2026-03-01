@@ -41,7 +41,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	if count == 0 {
 		role = "admin"
 	}
-	result, err := s.db.Exec(
+	id, err := s.db.InsertGetID(
 		"INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)",
 		req.Username, req.Email, string(hash), role,
 	)
@@ -49,7 +49,6 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "username or email already exists", http.StatusConflict)
 		return
 	}
-	id, _ := result.LastInsertId()
 	user := &models.User{
 		ID:       id,
 		Username: req.Username,

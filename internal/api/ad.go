@@ -150,7 +150,7 @@ func (s *Server) handleADGetVPN(w http.ResponseWriter, r *http.Request) {
 		teamIP := fmt.Sprintf("%s%d.1/24", base, teamID)
 		allowedIP := fmt.Sprintf("%s%d.0/24", base, teamID)
 
-		res, insErr := s.db.Exec(
+		newID, insErr := s.db.InsertGetID(
 			`INSERT INTO ad_vpn_peers (team_id, private_key, public_key, allowed_ip) VALUES (?, ?, ?, ?)`,
 			teamID, privB64, pubB64, allowedIP,
 		)
@@ -162,7 +162,7 @@ func (s *Server) handleADGetVPN(w http.ResponseWriter, r *http.Request) {
 		peer.PrivateKey = privB64
 		peer.PublicKey = pubB64
 		peer.AllowedIP = teamIP
-		peer.ID, _ = res.LastInsertId()
+		peer.ID = newID
 	} else if err != nil {
 		jsonError(w, "db error", http.StatusInternalServerError)
 		return
@@ -249,15 +249,14 @@ func (s *Server) handleADCreateSploit(w http.ResponseWriter, r *http.Request) {
 	if req.Language == "" {
 		req.Language = "python3"
 	}
-	res, err := s.db.Exec(
-		`INSERT INTO ad_sploits (team_id, challenge_id, name, language, script, enabled) VALUES (?,?,?,?,?,1)`,
+	id, err := s.db.InsertGetID(
+		`INSERT INTO ad_sploits (team_id, challenge_id, name, language, script, enabled) VALUES (?,?,?,?,?,TRUE)`,
 		teamID, req.ChallengeID, req.Name, req.Language, req.Script,
 	)
 	if err != nil {
 		jsonError(w, "db error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	id, _ := res.LastInsertId()
 	jsonResponse(w, http.StatusCreated, map[string]any{"id": id, "message": "sploit created"})
 }
 

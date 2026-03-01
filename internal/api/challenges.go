@@ -16,8 +16,8 @@ func (s *Server) handleListChallenges(w http.ResponseWriter, r *http.Request) {
 	userID := getUserID(r)
 	rows, err := s.db.Query(
 		`SELECT id, name, description, category, points, flag_type, deploy_type, deploy_backend, is_visible, created_at,
-		(SELECT COUNT(*) FROM submissions WHERE challenge_id=challenges.id AND is_correct=1) as solve_count
-		FROM challenges WHERE is_visible=1 ORDER BY category, points`)
+		(SELECT COUNT(*) FROM submissions WHERE challenge_id=challenges.id AND is_correct) as solve_count
+		FROM challenges WHERE is_visible ORDER BY category, points`)
 	if err != nil {
 		jsonError(w, "db error", http.StatusInternalServerError)
 		return
@@ -32,7 +32,7 @@ func (s *Server) handleListChallenges(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		var cnt int
-		_ = s.db.QueryRow("SELECT COUNT(*) FROM submissions WHERE user_id=? AND challenge_id=? AND is_correct=1", userID, c.ID).Scan(&cnt)
+		_ = s.db.QueryRow("SELECT COUNT(*) FROM submissions WHERE user_id=? AND challenge_id=? AND is_correct", userID, c.ID).Scan(&cnt)
 		c.Solved = cnt > 0
 		challenges = append(challenges, c)
 	}
@@ -51,7 +51,7 @@ func (s *Server) handleGetChallenge(w http.ResponseWriter, r *http.Request) {
 	userID := getUserID(r)
 	var c models.Challenge
 	err = s.db.QueryRow(
-		`SELECT id, name, description, category, points, flag_type, deploy_type, deploy_backend, image, is_visible, created_at FROM challenges WHERE id=? AND is_visible=1`,
+		`SELECT id, name, description, category, points, flag_type, deploy_type, deploy_backend, image, is_visible, created_at FROM challenges WHERE id=? AND is_visible`,
 		id,
 	).Scan(&c.ID, &c.Name, &c.Description, &c.Category, &c.Points, &c.FlagType, &c.DeployType, &c.DeployBackend, &c.Image, &c.IsVisible, &c.CreatedAt)
 	if err == sql.ErrNoRows {
@@ -62,9 +62,9 @@ func (s *Server) handleGetChallenge(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "db error", http.StatusInternalServerError)
 		return
 	}
-	_ = s.db.QueryRow("SELECT COUNT(*) FROM submissions WHERE challenge_id=? AND is_correct=1", id).Scan(&c.SolveCount)
+	_ = s.db.QueryRow("SELECT COUNT(*) FROM submissions WHERE challenge_id=? AND is_correct", id).Scan(&c.SolveCount)
 	var cnt int
-	_ = s.db.QueryRow("SELECT COUNT(*) FROM submissions WHERE user_id=? AND challenge_id=? AND is_correct=1", userID, id).Scan(&cnt)
+	_ = s.db.QueryRow("SELECT COUNT(*) FROM submissions WHERE user_id=? AND challenge_id=? AND is_correct", userID, id).Scan(&cnt)
 	c.Solved = cnt > 0
 	jsonResponse(w, http.StatusOK, c)
 }
@@ -86,7 +86,7 @@ func (s *Server) handleSubmitFlag(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var solvedCount int
-	_ = s.db.QueryRow("SELECT COUNT(*) FROM submissions WHERE user_id=? AND challenge_id=? AND is_correct=1", userID, id).Scan(&solvedCount)
+	_ = s.db.QueryRow("SELECT COUNT(*) FROM submissions WHERE user_id=? AND challenge_id=? AND is_correct", userID, id).Scan(&solvedCount)
 	if solvedCount > 0 {
 		jsonError(w, "already solved", http.StatusConflict)
 		return
@@ -95,7 +95,7 @@ func (s *Server) handleSubmitFlag(w http.ResponseWriter, r *http.Request) {
 	var correctFlag string
 	var points int
 	var flagType string
-	err = s.db.QueryRow("SELECT flag, points, flag_type FROM challenges WHERE id=? AND is_visible=1", id).Scan(&correctFlag, &points, &flagType)
+	err = s.db.QueryRow("SELECT flag, points, flag_type FROM challenges WHERE id=? AND is_visible", id).Scan(&correctFlag, &points, &flagType)
 	if err == sql.ErrNoRows {
 		jsonError(w, "challenge not found", http.StatusNotFound)
 		return
@@ -105,7 +105,6 @@ func (s *Server) handleSubmitFlag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ip := getClientIP(r)
 	var isCorrect bool
 	if flagType == "regex" {
 		re, err := regexp.Compile(correctFlag)
@@ -113,14 +112,11 @@ func (s *Server) handleSubmitFlag(w http.ResponseWriter, r *http.Request) {
 	} else {
 		isCorrect = req.Flag == correctFlag
 	}
-	isCorrectInt := 0
-	if isCorrect {
-		isCorrectInt = 1
-	}
+	ip := getClientIP(r)
 
 	if _, err := s.db.Exec(
 		"INSERT INTO submissions (user_id, challenge_id, flag, is_correct, ip) VALUES (?, ?, ?, ?, ?)",
-		userID, id, req.Flag, isCorrectInt, ip,
+		userID, id, req.Flag, isCorrect, ip,
 	); err != nil {
 		jsonError(w, "db error recording submission", http.StatusInternalServerError)
 		return
@@ -164,7 +160,7 @@ func (s *Server) handleAdminCreateChallenge(w http.ResponseWriter, r *http.Reque
 	if c.DeployConfig == "" {
 		c.DeployConfig = "{}"
 	}
-	result, err := s.db.Exec(
+	id, err := s.db.InsertGetID(
 		`INSERT INTO challenges (name, description, category, points, flag, flag_type, deploy_type, deploy_backend, deploy_config, image, vm_template, is_visible) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
 		c.Name, c.Description, c.Category, c.Points, c.Flag, c.FlagType, c.DeployType, c.DeployBackend, c.DeployConfig, c.Image, c.VMTemplate, c.IsVisible,
 	)
@@ -172,7 +168,6 @@ func (s *Server) handleAdminCreateChallenge(w http.ResponseWriter, r *http.Reque
 		jsonError(w, "db error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	id, _ := result.LastInsertId()
 	c.ID = id
 	jsonResponse(w, http.StatusCreated, c)
 }

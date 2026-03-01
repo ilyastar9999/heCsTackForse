@@ -5,8 +5,11 @@ server:
   static_dir: ./frontend
 
 database:
-  driver: sqlite
+  driver: sqlite    # sqlite | postgres
   dsn: ./ctf.db
+  # PostgreSQL example:
+  # driver: postgres
+  # dsn: "postgres://ctf:ctf@localhost:5432/ctf?sslmode=disable"
 
 ctf:
   name: "My CTF"

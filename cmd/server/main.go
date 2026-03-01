@@ -28,7 +28,7 @@ func main() {
 		log.Fatalf("failed to load config: %v", err)
 	}
 
-	database, err := db.New(cfg.Database.DSN)
+	database, err := db.New(cfg.Database.Driver, cfg.Database.DSN)
 	if err != nil {
 		log.Fatalf("failed to open database: %v", err)
 	}
