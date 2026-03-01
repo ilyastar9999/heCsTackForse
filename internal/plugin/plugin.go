@@ -60,18 +60,10 @@ func (d *DynamicScorer) CalculateScore(challenge *models.Challenge, solveCount i
 	if maxPts == 0 {
 		maxPts = challenge.Points
 	}
-	minPts := d.MinPoints
-	if minPts == 0 {
-		minPts = 50
-	}
-	decay := d.Decay
-	if decay == 0 {
-		decay = 0.05
-	}
 	// Exponential decay: score approaches MinPoints as solveCount grows.
-	score := float64(minPts) + float64(maxPts-minPts)*math.Exp(-decay*float64(solveCount))
-	if score < float64(minPts) {
-		score = float64(minPts)
+	score := float64(d.MinPoints) + float64(maxPts-d.MinPoints)*math.Exp(-d.Decay*float64(solveCount))
+	if score < float64(d.MinPoints) {
+		score = float64(d.MinPoints)
 	}
 	return int(score)
 }

@@ -39,7 +39,7 @@
   <script>
     async function logout() {
       await apiFetch('/api/auth/logout', { method: 'POST' });
-      localStorage.removeItem('token');
+      
       location.reload();
     }
     (async () => {

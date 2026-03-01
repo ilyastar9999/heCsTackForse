@@ -52,7 +52,7 @@
           method: 'POST',
           body: JSON.stringify({ username, email, password }),
         });
-        localStorage.setItem('token', data.token);
+        // Token is stored in an HttpOnly cookie set by the server; no localStorage needed.
         window.location.href = '/challenges';
       } catch (err) {
         errEl.textContent = err.message || 'Registration failed';

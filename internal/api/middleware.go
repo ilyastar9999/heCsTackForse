@@ -109,14 +109,23 @@ func (rl *rateLimiter) allow(key string, limit int, window time.Duration) bool {
 	return true
 }
 
+// getClientIP returns the real client IP from RemoteAddr, stripping the port.
+// X-Forwarded-For is intentionally NOT trusted here to prevent rate-limit bypass
+// via header spoofing. If the service runs behind a trusted reverse proxy, this
+// function can be extended to validate the proxy's IP before trusting XFF.
+func getClientIP(r *http.Request) string {
+	ip := r.RemoteAddr
+	if idx := strings.LastIndex(ip, ":"); idx != -1 {
+		ip = ip[:idx]
+	}
+	return ip
+}
+
 func (s *Server) rateLimitMiddleware(limit int, window time.Duration) func(http.Handler) http.Handler {
 	rl := s.rateLimiter
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ip := r.RemoteAddr
-			if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-				ip = strings.Split(xff, ",")[0]
-			}
+			ip := getClientIP(r)
 			if !rl.allow(ip, limit, window) {
 				http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
 				return

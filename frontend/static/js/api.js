@@ -1,12 +1,12 @@
 // api.js – shared API helpers
+// Authentication relies on the HttpOnly cookie set by the server on login.
+// The token is NOT stored in localStorage to prevent XSS-based token theft.
 
 const BASE = '';
 
 async function apiFetch(path, opts = {}) {
-  const token = localStorage.getItem('token');
   const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
-  if (token) headers['Authorization'] = 'Bearer ' + token;
-  const res = await fetch(BASE + path, { ...opts, headers });
+  const res = await fetch(BASE + path, { ...opts, headers, credentials: 'same-origin' });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error(data.error || `HTTP ${res.status}`);
