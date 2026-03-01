@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>heCsTackForse CTF</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a class="brand" href="/">heCsTackForse</a>
+    <div class="nav-links" id="nav-links">
+      <a href="/challenges">Challenges</a>
+      <a href="/scoreboard">Scoreboard</a>
+      <a href="/profile" id="nav-profile" style="display:none">Profile</a>
+      <a href="/admin" id="nav-admin" style="display:none">Admin</a>
+      <a href="/login" id="nav-login">Login</a>
+      <a href="/register" id="nav-register">Register</a>
+      <a href="#" id="nav-logout" style="display:none" onclick="logout()">Logout</a>
+    </div>
+  </nav>
+  <main class="hero">
+    <h1>Welcome to <span class="highlight">heCsTackForse</span></h1>
+    <p class="subtitle">A full-featured Capture The Flag platform</p>
+    <div class="hero-buttons">
+      <a href="/challenges" class="btn btn-primary">View Challenges</a>
+      <a href="/scoreboard" class="btn btn-secondary">Scoreboard</a>
+    </div>
+  </main>
+  <script src="/static/js/api.js"></script>
+  <script>
+    (async () => {
+      const user = await getMe();
+      if (user) {
+        document.getElementById('nav-profile').style.display = '';
+        document.getElementById('nav-login').style.display = 'none';
+        document.getElementById('nav-register').style.display = 'none';
+        document.getElementById('nav-logout').style.display = '';
+        if (user.role === 'admin') {
+          document.getElementById('nav-admin').style.display = '';
+        }
+      }
+    })();
+    async function logout() {
+      await apiFetch('/api/auth/logout', { method: 'POST' });
+      localStorage.removeItem('token');
+      location.reload();
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Challenges – heCsTackForse</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a class="brand" href="/">heCsTackForse</a>
+    <div class="nav-links">
+      <a href="/challenges">Challenges</a>
+      <a href="/scoreboard">Scoreboard</a>
+      <a href="/profile" id="nav-profile" style="display:none">Profile</a>
+      <a href="/admin" id="nav-admin" style="display:none">Admin</a>
+      <a href="/login" id="nav-login">Login</a>
+      <a href="/register" id="nav-register">Register</a>
+      <a href="#" id="nav-logout" style="display:none" onclick="logout()">Logout</a>
+    </div>
+  </nav>
+  <main class="container">
+    <h1>Challenges</h1>
+    <div id="categories"></div>
+  </main>
+
+  <!-- Flag submission modal -->
+  <div id="modal-overlay" class="modal-overlay" style="display:none" onclick="closeModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="closeModal()">✕</button>
+      <h2 id="modal-title"></h2>
+      <p id="modal-desc"></p>
+      <div class="modal-meta">
+        <span id="modal-category" class="badge"></span>
+        <span id="modal-points" class="badge badge-pts"></span>
+        <span id="modal-solves" class="badge badge-solves"></span>
+      </div>
+      <div id="modal-solved-notice" class="alert alert-success" style="display:none">✓ Already solved!</div>
+      <form id="flag-form" onsubmit="submitFlag(event)">
+        <div class="form-group">
+          <label>Flag</label>
+          <input type="text" id="flag-input" placeholder="FLAG{...}" autocomplete="off">
+        </div>
+        <div id="flag-error" class="alert alert-error" style="display:none"></div>
+        <div id="flag-success" class="alert alert-success" style="display:none"></div>
+        <button type="submit" class="btn btn-primary" id="submit-btn">Submit</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/challenges.js"></script>
+  <script>
+    async function logout() {
+      await apiFetch('/api/auth/logout', { method: 'POST' });
+      localStorage.removeItem('token');
+      location.href = '/login';
+    }
+    (async () => {
+      const user = await getMe();
+      if (!user) { location.href = '/login'; return; }
+      document.getElementById('nav-profile').style.display = '';
+      document.getElementById('nav-login').style.display = 'none';
+      document.getElementById('nav-register').style.display = 'none';
+      document.getElementById('nav-logout').style.display = '';
+      if (user.role === 'admin') document.getElementById('nav-admin').style.display = '';
+      loadChallenges();
+    })();
+  </script>
+</body>
+</html>

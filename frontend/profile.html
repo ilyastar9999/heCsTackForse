@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profile – heCsTackForse</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a class="brand" href="/">heCsTackForse</a>
+    <div class="nav-links">
+      <a href="/challenges">Challenges</a>
+      <a href="/scoreboard">Scoreboard</a>
+      <a href="/profile">Profile</a>
+      <a href="/admin" id="nav-admin" style="display:none">Admin</a>
+      <a href="#" onclick="logout()">Logout</a>
+    </div>
+  </nav>
+  <main class="container">
+    <div class="profile-card" id="profile-card">
+      <div class="loading">Loading...</div>
+    </div>
+  </main>
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/profile.js"></script>
+  <script>
+    async function logout() {
+      await apiFetch('/api/auth/logout', { method: 'POST' });
+      localStorage.removeItem('token');
+      location.href = '/login';
+    }
+    (async () => {
+      const user = await getMe();
+      if (!user) { location.href = '/login'; return; }
+      if (user.role === 'admin') document.getElementById('nav-admin').style.display = '';
+      loadProfile(user);
+    })();
+  </script>
+</body>
+</html>

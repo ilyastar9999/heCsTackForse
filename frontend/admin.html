@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin – heCsTackForse</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a class="brand" href="/">heCsTackForse</a>
+    <div class="nav-links">
+      <a href="/challenges">Challenges</a>
+      <a href="/scoreboard">Scoreboard</a>
+      <a href="/profile">Profile</a>
+      <a href="/admin">Admin</a>
+      <a href="#" onclick="logout()">Logout</a>
+    </div>
+  </nav>
+  <main class="container">
+    <h1>Admin Panel</h1>
+    <div class="tabs">
+      <button class="tab active" onclick="showTab('challenges')">Challenges</button>
+      <button class="tab" onclick="showTab('users')">Users</button>
+    </div>
+
+    <!-- Challenges Tab -->
+    <div id="tab-challenges" class="tab-content">
+      <div class="admin-toolbar">
+        <button class="btn btn-primary" onclick="openCreateChallenge()">+ New Challenge</button>
+      </div>
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>ID</th><th>Name</th><th>Category</th><th>Points</th><th>Visible</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="challenges-body">
+          <tr><td colspan="6" class="loading">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Users Tab -->
+    <div id="tab-users" class="tab-content" style="display:none">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>ID</th><th>Username</th><th>Email</th><th>Role</th><th>Score</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="users-body">
+          <tr><td colspan="6" class="loading">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <!-- Challenge Modal -->
+  <div id="ch-modal-overlay" class="modal-overlay" style="display:none" onclick="closeChallengeModal()">
+    <div class="modal modal-wide" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="closeChallengeModal()">✕</button>
+      <h2 id="ch-modal-title">New Challenge</h2>
+      <form id="ch-form" onsubmit="saveChallengeForm(event)">
+        <input type="hidden" id="ch-id">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Name</label>
+            <input type="text" id="ch-name" required>
+          </div>
+          <div class="form-group">
+            <label>Category</label>
+            <input type="text" id="ch-category" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <textarea id="ch-description" rows="4" required></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Points</label>
+            <input type="number" id="ch-points" value="100" required>
+          </div>
+          <div class="form-group">
+            <label>Flag</label>
+            <input type="text" id="ch-flag" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Flag Type</label>
+            <select id="ch-flag-type">
+              <option value="static">Static</option>
+              <option value="regex">Regex</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Deploy Type</label>
+            <select id="ch-deploy-type">
+              <option value="no_deploy">No Deploy</option>
+              <option value="single_instance">Single Instance</option>
+              <option value="per_user">Per User</option>
+              <option value="attack_defence">Attack &amp; Defence</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Deploy Backend</label>
+            <select id="ch-deploy-backend">
+              <option value="">None</option>
+              <option value="docker">Docker</option>
+              <option value="kubernetes">Kubernetes</option>
+              <option value="pve">Proxmox VE</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Image</label>
+            <input type="text" id="ch-image" placeholder="docker image or leave blank">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Deploy Config (JSON)</label>
+          <textarea id="ch-deploy-config" rows="2">{}</textarea>
+        </div>
+        <div class="form-group checkbox-group">
+          <label><input type="checkbox" id="ch-visible" checked> Visible</label>
+        </div>
+        <div id="ch-error" class="alert alert-error" style="display:none"></div>
+        <button type="submit" class="btn btn-primary">Save</button>
+        <button type="button" class="btn btn-secondary" onclick="closeChallengeModal()">Cancel</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script>
+    async function logout() {
+      await apiFetch('/api/auth/logout', { method: 'POST' });
+      localStorage.removeItem('token');
+      location.href = '/login';
+    }
+
+    function showTab(name) {
+      document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+      document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+      document.getElementById('tab-' + name).style.display = '';
+      event.target.classList.add('active');
+      if (name === 'challenges') loadAdminChallenges();
+      else if (name === 'users') loadAdminUsers();
+    }
+
+    async function loadAdminChallenges() {
+      const challenges = await apiFetch('/api/admin/challenges');
+      const tbody = document.getElementById('challenges-body');
+      tbody.innerHTML = challenges.map(c => `
+        <tr>
+          <td>${c.id}</td>
+          <td>${escHtml(c.name)}</td>
+          <td>${escHtml(c.category)}</td>
+          <td>${c.points}</td>
+          <td>${c.is_visible ? '✓' : '✗'}</td>
+          <td>
+            <button class="btn btn-sm btn-secondary" onclick='editChallenge(${JSON.stringify(c)})'>Edit</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteChallenge(${c.id})">Delete</button>
+          </td>
+        </tr>`).join('');
+    }
+
+    async function loadAdminUsers() {
+      const users = await apiFetch('/api/admin/users');
+      const tbody = document.getElementById('users-body');
+      tbody.innerHTML = users.map(u => `
+        <tr>
+          <td>${u.id}</td>
+          <td>${escHtml(u.username)}</td>
+          <td>${escHtml(u.email)}</td>
+          <td>
+            <select onchange="updateUserRole(${u.id}, this.value, ${u.score})">
+              <option${u.role==='user'?' selected':''}>user</option>
+              <option${u.role==='admin'?' selected':''}>admin</option>
+            </select>
+          </td>
+          <td>${u.score}</td>
+          <td><button class="btn btn-sm btn-secondary" onclick="promptScore(${u.id}, ${u.score}, '${escHtml(u.role)}')">Set Score</button></td>
+        </tr>`).join('');
+    }
+
+    async function updateUserRole(id, role, score) {
+      await apiFetch('/api/admin/users/' + id, { method: 'PUT', body: JSON.stringify({ role, score }) });
+    }
+
+    async function promptScore(id, currentScore, role) {
+      const score = prompt('New score:', currentScore);
+      if (score === null) return;
+      await apiFetch('/api/admin/users/' + id, { method: 'PUT', body: JSON.stringify({ role, score: parseInt(score) }) });
+      loadAdminUsers();
+    }
+
+    function openCreateChallenge() {
+      document.getElementById('ch-modal-title').textContent = 'New Challenge';
+      document.getElementById('ch-form').reset();
+      document.getElementById('ch-id').value = '';
+      document.getElementById('ch-deploy-config').value = '{}';
+      document.getElementById('ch-visible').checked = true;
+      document.getElementById('ch-error').style.display = 'none';
+      document.getElementById('ch-modal-overlay').style.display = 'flex';
+    }
+
+    function editChallenge(c) {
+      document.getElementById('ch-modal-title').textContent = 'Edit Challenge';
+      document.getElementById('ch-id').value = c.id;
+      document.getElementById('ch-name').value = c.name;
+      document.getElementById('ch-category').value = c.category;
+      document.getElementById('ch-description').value = c.description;
+      document.getElementById('ch-points').value = c.points;
+      document.getElementById('ch-flag').value = c.flag;
+      document.getElementById('ch-flag-type').value = c.flag_type;
+      document.getElementById('ch-deploy-type').value = c.deploy_type;
+      document.getElementById('ch-deploy-backend').value = c.deploy_backend;
+      document.getElementById('ch-image').value = c.image;
+      document.getElementById('ch-deploy-config').value = c.deploy_config;
+      document.getElementById('ch-visible').checked = c.is_visible;
+      document.getElementById('ch-error').style.display = 'none';
+      document.getElementById('ch-modal-overlay').style.display = 'flex';
+    }
+
+    function closeChallengeModal() {
+      document.getElementById('ch-modal-overlay').style.display = 'none';
+    }
+
+    async function saveChallengeForm(e) {
+      e.preventDefault();
+      const id = document.getElementById('ch-id').value;
+      const body = {
+        name: document.getElementById('ch-name').value,
+        category: document.getElementById('ch-category').value,
+        description: document.getElementById('ch-description').value,
+        points: parseInt(document.getElementById('ch-points').value),
+        flag: document.getElementById('ch-flag').value,
+        flag_type: document.getElementById('ch-flag-type').value,
+        deploy_type: document.getElementById('ch-deploy-type').value,
+        deploy_backend: document.getElementById('ch-deploy-backend').value,
+        image: document.getElementById('ch-image').value,
+        deploy_config: document.getElementById('ch-deploy-config').value,
+        is_visible: document.getElementById('ch-visible').checked,
+      };
+      const errEl = document.getElementById('ch-error');
+      try {
+        if (id) {
+          await apiFetch('/api/admin/challenges/' + id, { method: 'PUT', body: JSON.stringify(body) });
+        } else {
+          await apiFetch('/api/admin/challenges', { method: 'POST', body: JSON.stringify(body) });
+        }
+        closeChallengeModal();
+        loadAdminChallenges();
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.style.display = 'block';
+      }
+    }
+
+    async function deleteChallenge(id) {
+      if (!confirm('Delete challenge ' + id + '?')) return;
+      await apiFetch('/api/admin/challenges/' + id, { method: 'DELETE' });
+      loadAdminChallenges();
+    }
+
+    function escHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    (async () => {
+      const user = await getMe();
+      if (!user || user.role !== 'admin') { location.href = '/'; return; }
+      loadAdminChallenges();
+    })();
+  </script>
+</body>
+</html>

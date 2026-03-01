@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scoreboard – heCsTackForse</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a class="brand" href="/">heCsTackForse</a>
+    <div class="nav-links">
+      <a href="/challenges">Challenges</a>
+      <a href="/scoreboard">Scoreboard</a>
+      <a href="/profile" id="nav-profile" style="display:none">Profile</a>
+      <a href="/login" id="nav-login">Login</a>
+      <a href="/register" id="nav-register">Register</a>
+      <a href="#" id="nav-logout" style="display:none" onclick="logout()">Logout</a>
+    </div>
+  </nav>
+  <main class="container">
+    <h1>Scoreboard</h1>
+    <table class="scoreboard-table" id="scoreboard-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Name</th>
+          <th>Solves</th>
+          <th>Score</th>
+        </tr>
+      </thead>
+      <tbody id="scoreboard-body">
+        <tr><td colspan="4" class="loading">Loading...</td></tr>
+      </tbody>
+    </table>
+  </main>
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/scoreboard.js"></script>
+  <script>
+    async function logout() {
+      await apiFetch('/api/auth/logout', { method: 'POST' });
+      localStorage.removeItem('token');
+      location.reload();
+    }
+    (async () => {
+      const user = await getMe();
+      if (user) {
+        document.getElementById('nav-profile').style.display = '';
+        document.getElementById('nav-login').style.display = 'none';
+        document.getElementById('nav-register').style.display = 'none';
+        document.getElementById('nav-logout').style.display = '';
+      }
+    })();
+  </script>
+</body>
+</html>

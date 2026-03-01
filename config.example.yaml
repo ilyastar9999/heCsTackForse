@@ -1,0 +1,42 @@
+server:
+  host: 0.0.0.0
+  port: 8080
+  secret_key: change-me-in-production-use-a-long-random-string
+  static_dir: ./frontend
+
+database:
+  driver: sqlite
+  dsn: ./ctf.db
+
+ctf:
+  name: "My CTF"
+  mode: ctf           # ctf | ad (attack & defence)
+  team_mode: false
+  registration_open: true
+  scoring: static     # static | dynamic
+  flag_prefix: "FLAG{"
+  flag_suffix: "}"
+
+deployer:
+  instance_ttl: 4h
+  backends:
+    docker:
+      enabled: false
+      registry: ""
+      network: ctf-net
+    kubernetes:
+      enabled: false
+      kubeconfig: ""
+      namespace: ctf
+    pve:
+      enabled: false
+      url: https://pve.example.com:8006
+      token_id: user@pam!token
+      token_secret: secret
+      node: pve
+      vm_template: 100
+
+ad:
+  round_duration: 5m
+  flag_lifetime: 2
+  teams: []

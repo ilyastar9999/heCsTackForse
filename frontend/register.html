@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Register – heCsTackForse</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a class="brand" href="/">heCsTackForse</a>
+    <div class="nav-links">
+      <a href="/challenges">Challenges</a>
+      <a href="/scoreboard">Scoreboard</a>
+      <a href="/login">Login</a>
+      <a href="/register">Register</a>
+    </div>
+  </nav>
+  <main class="form-page">
+    <div class="form-card">
+      <h2>Register</h2>
+      <div id="error-msg" class="alert alert-error" style="display:none"></div>
+      <form id="register-form">
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="username" name="username" required autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="email" name="email" required autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="password" name="password" required autocomplete="new-password">
+        </div>
+        <button type="submit" class="btn btn-primary btn-full">Register</button>
+      </form>
+      <p class="form-footer">Already have an account? <a href="/login">Login</a></p>
+    </div>
+  </main>
+  <script src="/static/js/api.js"></script>
+  <script>
+    document.getElementById('register-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const username = document.getElementById('username').value;
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const errEl = document.getElementById('error-msg');
+      errEl.style.display = 'none';
+      try {
+        const data = await apiFetch('/api/auth/register', {
+          method: 'POST',
+          body: JSON.stringify({ username, email, password }),
+        });
+        localStorage.setItem('token', data.token);
+        window.location.href = '/challenges';
+      } catch (err) {
+        errEl.textContent = err.message || 'Registration failed';
+        errEl.style.display = 'block';
+      }
+    });
+  </script>
+</body>
+</html>
