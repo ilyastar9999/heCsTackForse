@@ -1,13 +1,16 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
+	"github.com/ilyastar9999/heCsTackForse/internal/ad"
 	"github.com/ilyastar9999/heCsTackForse/internal/config"
 	"github.com/ilyastar9999/heCsTackForse/internal/db"
 	"github.com/ilyastar9999/heCsTackForse/internal/deployer"
@@ -17,12 +20,13 @@ type Server struct {
 	cfg         *config.Config
 	db          *db.DB
 	deployer    *deployer.Manager
+	adEngine    *ad.Engine
 	r           *chi.Mux
 	rateLimiter *rateLimiter
 }
 
-func NewServer(cfg *config.Config, database *db.DB, mgr *deployer.Manager) *Server {
-	s := &Server{cfg: cfg, db: database, deployer: mgr, rateLimiter: newRateLimiter()}
+func NewServer(cfg *config.Config, database *db.DB, mgr *deployer.Manager, adEng *ad.Engine) *Server {
+	s := &Server{cfg: cfg, db: database, deployer: mgr, adEngine: adEng, rateLimiter: newRateLimiter()}
 	s.r = s.buildRouter()
 	return s
 }
@@ -49,6 +53,7 @@ func (s *Server) buildRouter() *chi.Mux {
 	r.Get("/challenges", serveFile(s.cfg.Server.StaticDir+"/challenges.html"))
 	r.Get("/profile", serveFile(s.cfg.Server.StaticDir+"/profile.html"))
 	r.Get("/admin", serveFile(s.cfg.Server.StaticDir+"/admin.html"))
+	r.Get("/ad", serveFile(s.cfg.Server.StaticDir+"/ad.html"))
 
 	// API routes
 	r.Route("/api", func(r chi.Router) {
@@ -71,6 +76,18 @@ func (s *Server) buildRouter() *chi.Mux {
 			r.Post("/teams", s.handleCreateTeam)
 			r.Post("/teams/join", s.handleJoinTeam)
 			r.Get("/teams/{id}", s.handleGetTeam)
+
+			// Attack & Defence
+			r.Get("/ad/status", s.handleADStatus)
+			r.Get("/ad/scoreboard", s.handleADScoreboard)
+			r.Get("/ad/services", s.handleADServices)
+			r.Get("/ad/vpn", s.handleADGetVPN)
+			r.Get("/ad/sploits", s.handleADListSploits)
+			r.Post("/ad/sploits", s.handleADCreateSploit)
+			r.Put("/ad/sploits/{id}", s.handleADUpdateSploit)
+			r.Delete("/ad/sploits/{id}", s.handleADDeleteSploit)
+			r.Get("/ad/sploits/{id}/results", s.handleADSploitResults)
+			r.With(s.rateLimitMiddleware(20, 60*time.Second)).Post("/ad/flags/submit", s.handleADSubmitFlag)
 		})
 
 		// Admin
@@ -103,4 +120,9 @@ func jsonResponse(w http.ResponseWriter, status int, data any) {
 
 func jsonError(w http.ResponseWriter, msg string, status int) {
 	jsonResponse(w, status, map[string]string{"error": msg})
+}
+
+// jsonBody wraps a byte slice as an io.Reader (avoids importing bytes in ad.go).
+func jsonBody(b []byte) io.Reader {
+	return bytes.NewReader(b)
 }

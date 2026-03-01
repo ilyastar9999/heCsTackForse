@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ilyastar9999/heCsTackForse/internal/ad"
 	"github.com/ilyastar9999/heCsTackForse/internal/api"
 	"github.com/ilyastar9999/heCsTackForse/internal/config"
 	"github.com/ilyastar9999/heCsTackForse/internal/db"
@@ -68,7 +69,18 @@ func main() {
 		))
 	}
 
-	srv := api.NewServer(cfg, database, mgr)
+	// Start AD engine if mode is "ad"
+	var adEngine *ad.Engine
+	if cfg.CTF.Mode == "ad" {
+		engine, err := ad.New(database, cfg)
+		if err != nil {
+			log.Fatalf("failed to create AD engine: %v", err)
+		}
+		adEngine = engine
+		adEngine.Start()
+	}
+
+	srv := api.NewServer(cfg, database, mgr, adEngine)
 
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 	httpServer := &http.Server{
@@ -91,6 +103,9 @@ func main() {
 	<-quit
 
 	log.Println("shutting down...")
+	if adEngine != nil {
+		adEngine.Stop()
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := httpServer.Shutdown(ctx); err != nil {

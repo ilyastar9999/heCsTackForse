@@ -85,6 +85,46 @@ func (d *DB) Migrate() error {
 			score INTEGER NOT NULL DEFAULT 0,
 			checked_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		)`,
+		`CREATE TABLE IF NOT EXISTS ad_sploits (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			team_id INTEGER NOT NULL,
+			challenge_id INTEGER NOT NULL,
+			name TEXT NOT NULL,
+			language TEXT NOT NULL DEFAULT 'python3',
+			script TEXT NOT NULL,
+			enabled INTEGER NOT NULL DEFAULT 1,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			last_run_at DATETIME,
+			FOREIGN KEY (team_id) REFERENCES teams(id),
+			FOREIGN KEY (challenge_id) REFERENCES challenges(id)
+		)`,
+		`CREATE TABLE IF NOT EXISTS ad_sploit_results (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			sploit_id INTEGER NOT NULL,
+			target_team_id INTEGER NOT NULL,
+			round INTEGER NOT NULL,
+			stdout TEXT NOT NULL DEFAULT '',
+			flags_captured INTEGER NOT NULL DEFAULT 0,
+			flags_submitted INTEGER NOT NULL DEFAULT 0,
+			error TEXT NOT NULL DEFAULT '',
+			ran_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (sploit_id) REFERENCES ad_sploits(id)
+		)`,
+		`CREATE TABLE IF NOT EXISTS ad_vpn_peers (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			team_id INTEGER NOT NULL UNIQUE,
+			private_key TEXT NOT NULL,
+			public_key TEXT NOT NULL,
+			allowed_ip TEXT NOT NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (team_id) REFERENCES teams(id)
+		)`,
+		`CREATE TABLE IF NOT EXISTS ad_rounds (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			round INTEGER NOT NULL UNIQUE,
+			started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			finished_at DATETIME
+		)`,
 	}
 	for _, q := range queries {
 		if _, err := d.Exec(q); err != nil {

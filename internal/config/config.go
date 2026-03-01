@@ -71,9 +71,27 @@ type PVEConfig struct {
 }
 
 type ADConfig struct {
-	RoundDuration string   `yaml:"round_duration"`
-	FlagLifetime  int      `yaml:"flag_lifetime"`
-	Teams         []string `yaml:"teams"`
+	RoundDuration  string    `yaml:"round_duration"`
+	FlagLifetime   int       `yaml:"flag_lifetime"`
+	Teams          []string  `yaml:"teams"`
+	FlagSubmitURL  string    `yaml:"flag_submit_url"`  // e.g. http://10.10.10.10/flags
+	FlagSubmitKey  string    `yaml:"flag_submit_key"`  // auth key/token for the central flag submitter
+	CheckerTimeout string    `yaml:"checker_timeout"`  // e.g. 30s
+	SploitTimeout  string    `yaml:"sploit_timeout"`   // e.g. 60s
+	SploitDir      string    `yaml:"sploit_dir"`       // writable dir for temp sploit files
+	VPN            VPNConfig `yaml:"vpn"`
+}
+
+// VPNConfig holds the WireGuard server-side parameters needed to generate
+// per-team client configuration files.
+type VPNConfig struct {
+	Enabled         bool   `yaml:"enabled"`
+	ServerPublicKey string `yaml:"server_public_key"` // WireGuard public key of the server peer
+	ServerEndpoint  string `yaml:"server_endpoint"`   // host:port, e.g. vpn.example.com:51820
+	ServerIP        string `yaml:"server_ip"`         // server's WireGuard IP, e.g. 10.8.0.1
+	TeamSubnetBase  string `yaml:"team_subnet_base"`  // e.g. "10.8." — team N gets 10.8.N.0/24
+	GameNetCIDR     string `yaml:"game_net_cidr"`     // allowed-IPs route for the game network, e.g. 10.10.0.0/16
+	DNS             string `yaml:"dns"`               // optional DNS pushed to clients
 }
 
 func Load(path string) (*Config, error) {
@@ -94,6 +112,9 @@ func Load(path string) (*Config, error) {
 	cfg.Deployer.InstanceTTL = "4h"
 	cfg.AD.RoundDuration = "5m"
 	cfg.AD.FlagLifetime = 2
+	cfg.AD.CheckerTimeout = "30s"
+	cfg.AD.SploitTimeout = "60s"
+	cfg.AD.SploitDir = "/tmp/sploits"
 
 	data, err := os.ReadFile(path)
 	if err != nil {
