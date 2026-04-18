@@ -25,7 +25,7 @@ async function loadChallenges() {
             ${c.solved ? '<span class="solved-badge">SOLVED</span>' : ''}
             <div class="points">${c.points}</div>
             <div class="ch-name">${escHtml(c.name)}</div>
-            <div class="ch-solves">${c.solve_count} solve${c.solve_count !== 1 ? 's' : ''}</div>
+            <div class="ch-solves">${typeof c.solve_count === 'number' ? c.solve_count : 0} solve${c.solve_count !== 1 ? 's' : ''}</div>
           </div>`).join('')}
       </div>`).join('');
   } catch (err) {
@@ -41,7 +41,7 @@ async function openChallenge(id) {
     document.getElementById('modal-title').textContent = c.name;
     // Render markdown in description
     document.getElementById('modal-desc').innerHTML = window.marked ? marked.parse(c.description || "") : escHtml(c.description || "");
-    document.getElementById('modal-solves').textContent = c.solve_count + ' solve' + (c.solve_count !== 1 ? 's' : '');
+    document.getElementById('modal-solves').textContent = (typeof c.solve_count === 'number' ? c.solve_count : 0) + ' solve' + (c.solve_count !== 1 ? 's' : '');
 
     // Meta badges
     document.getElementById('modal-meta').innerHTML = `
