@@ -18,6 +18,9 @@
         <ul class="navbar-nav me-auto">
           <li class="nav-item"><a class="nav-link" data-i18n="nav.challenges" href="/challenges">Challenges</a></li>
           <li class="nav-item"><a class="nav-link" data-i18n="nav.scoreboard" href="/scoreboard">Scoreboard</a></li>
+          <li class="nav-item" id="nav-notifications-li" style="display:none">
+            <a class="nav-link bell-indicator" data-i18n="nav.notifications" href="/notifications">🔔 Notifications</a>
+          </li>
         </ul>
         <ul class="navbar-nav ms-auto">
           <li class="nav-item" id="nav-admin" style="display:none"><a class="nav-link" data-i18n="nav.admin" href="/admin">Admin</a></li>
@@ -59,6 +62,7 @@
         document.getElementById('nav-login-li').style.display = 'none';
         document.getElementById('nav-register-li').style.display = 'none';
         document.getElementById('nav-logout-li').style.display = '';
+        document.getElementById('nav-notifications-li').style.display = '';
         document.getElementById('hero-register').style.display = 'none';
         if (user.role === 'admin') document.getElementById('nav-admin').style.display = '';
       }

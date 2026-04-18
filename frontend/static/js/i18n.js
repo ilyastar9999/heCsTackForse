@@ -43,6 +43,25 @@ async function initI18n() {
   await loadLocale(_lang);
   applyI18n();
   updateLangToggle();
+  loadTheme();
+}
+
+/**
+ * Load and apply a custom CSS theme from the server.
+ * Injects a <style> element with CSS variable overrides into <head>.
+ */
+async function loadTheme() {
+  try {
+    const vars = await fetch('/api/theme').then(r => r.ok ? r.json() : null).catch(() => null);
+    if (vars && typeof vars === 'object' && Object.keys(vars).length > 0) {
+      const style = document.createElement('style');
+      style.id = 'ctf-theme-override';
+      style.textContent = ':root {' + Object.entries(vars).map(([k, v]) => `${k}:${v}`).join(';') + '}';
+      const existing = document.getElementById('ctf-theme-override');
+      if (existing) existing.remove();
+      document.head.appendChild(style);
+    }
+  } catch (_) { /* ignore */ }
 }
 
 /**

@@ -46,6 +46,17 @@ type Notifier interface {
 	Notify(event Event) error
 }
 
+// ChallengeTypeExtension defines a custom challenge type that can be registered
+// by a plugin. Custom types appear in the Admin challenge creation form.
+type ChallengeTypeExtension interface {
+	Plugin
+	// TypeID is the unique string used as flag_type / challenge type identifier.
+	TypeID() string
+	// Verify checks whether submitted is correct for this challenge type.
+	// The data parameter holds any plugin-specific config stored in the challenge.
+	Verify(challengeData, submitted string) bool
+}
+
 // StaticScorer returns a fixed point value for challenges regardless of solve count.
 // It simply returns the challenge's configured Points field.
 type StaticScorer struct{}

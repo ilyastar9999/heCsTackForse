@@ -2,10 +2,16 @@ package api
 
 import (
 	"context"
+	crand "crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 
@@ -17,7 +23,7 @@ import (
 func (s *Server) handleListChallenges(c echo.Context) error {
 	userID := getUserID(c)
 	rows, err := s.db.Query(
-		`SELECT id, name, description, category, points, flag_type, deploy_type, deploy_backend, is_visible, created_at,
+		`SELECT id, name, description, category, points, flag_type, deploy_type, deploy_backend, is_visible, connection_info, created_at,
 		(SELECT COUNT(*) FROM submissions WHERE challenge_id=challenges.id AND is_correct) as solve_count
 		FROM challenges WHERE is_visible ORDER BY category, points`)
 	if err != nil {
@@ -29,7 +35,7 @@ func (s *Server) handleListChallenges(c echo.Context) error {
 	for rows.Next() {
 		var ch models.Challenge
 		if err := rows.Scan(&ch.ID, &ch.Name, &ch.Description, &ch.Category, &ch.Points,
-			&ch.FlagType, &ch.DeployType, &ch.DeployBackend, &ch.IsVisible, &ch.CreatedAt, &ch.SolveCount); err != nil {
+			&ch.FlagType, &ch.DeployType, &ch.DeployBackend, &ch.IsVisible, &ch.ConnectionInfo, &ch.CreatedAt, &ch.SolveCount); err != nil {
 			continue
 		}
 		// Apply dynamic scoring if configured
@@ -53,11 +59,11 @@ func (s *Server) handleGetChallenge(c echo.Context) error {
 	userID := getUserID(c)
 	var ch models.Challenge
 	err = s.db.QueryRow(
-		`SELECT id, name, description, category, points, flag_type, deploy_type, deploy_backend, image, is_visible, created_at,
+		`SELECT id, name, description, category, points, flag_type, deploy_type, deploy_backend, image, is_visible, connection_info, created_at,
 		(SELECT COUNT(*) FROM submissions WHERE challenge_id=challenges.id AND is_correct) as solve_count
 		FROM challenges WHERE id=? AND is_visible`,
 		id,
-	).Scan(&ch.ID, &ch.Name, &ch.Description, &ch.Category, &ch.Points, &ch.FlagType, &ch.DeployType, &ch.DeployBackend, &ch.Image, &ch.IsVisible, &ch.CreatedAt, &ch.SolveCount)
+	).Scan(&ch.ID, &ch.Name, &ch.Description, &ch.Category, &ch.Points, &ch.FlagType, &ch.DeployType, &ch.DeployBackend, &ch.Image, &ch.IsVisible, &ch.ConnectionInfo, &ch.CreatedAt, &ch.SolveCount)
 	if err == sql.ErrNoRows {
 		return c.JSON(http.StatusNotFound, map[string]string{"error": "not found"})
 	}
@@ -113,6 +119,29 @@ func (s *Server) handleSubmitFlag(c echo.Context) error {
 		checker, _ = plugin.Default.GetFlagChecker("exact")
 	}
 	isCorrect := checker.Check(correctFlag, req.Flag)
+
+	// If not correct yet, check challenge_flags table for additional flags
+	if !isCorrect {
+		flagRows, _ := s.db.Query("SELECT content, type FROM challenge_flags WHERE challenge_id=?", id)
+		if flagRows != nil {
+			defer flagRows.Close()
+			for flagRows.Next() {
+				var fc, ft string
+				if err := flagRows.Scan(&fc, &ft); err != nil {
+					continue
+				}
+				altChecker, _ := plugin.Default.GetFlagChecker(ft)
+				if altChecker == nil {
+					altChecker, _ = plugin.Default.GetFlagChecker("exact")
+				}
+				if altChecker != nil && altChecker.Check(fc, req.Flag) {
+					isCorrect = true
+					break
+				}
+			}
+		}
+	}
+
 	ip := getClientIP(c)
 
 	if _, err := s.db.Exec(
@@ -268,7 +297,7 @@ func (s *Server) handleStopInstance(c echo.Context) error {
 }
 
 func (s *Server) handleAdminListChallenges(c echo.Context) error {
-	rows, err := s.db.Query(`SELECT id, name, description, category, points, flag, flag_type, deploy_type, deploy_backend, deploy_config, image, vm_template, is_visible, created_at FROM challenges ORDER BY id`)
+	rows, err := s.db.Query(`SELECT id, name, description, category, points, flag, flag_type, deploy_type, deploy_backend, deploy_config, image, vm_template, is_visible, connection_info, max_attempts, created_at FROM challenges ORDER BY id`)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
 	}
@@ -276,7 +305,7 @@ func (s *Server) handleAdminListChallenges(c echo.Context) error {
 	var challenges []models.Challenge
 	for rows.Next() {
 		var ch models.Challenge
-		if err := rows.Scan(&ch.ID, &ch.Name, &ch.Description, &ch.Category, &ch.Points, &ch.Flag, &ch.FlagType, &ch.DeployType, &ch.DeployBackend, &ch.DeployConfig, &ch.Image, &ch.VMTemplate, &ch.IsVisible, &ch.CreatedAt); err != nil {
+		if err := rows.Scan(&ch.ID, &ch.Name, &ch.Description, &ch.Category, &ch.Points, &ch.Flag, &ch.FlagType, &ch.DeployType, &ch.DeployBackend, &ch.DeployConfig, &ch.Image, &ch.VMTemplate, &ch.IsVisible, &ch.ConnectionInfo, &ch.MaxAttempts, &ch.CreatedAt); err != nil {
 			continue
 		}
 		challenges = append(challenges, ch)
@@ -296,8 +325,8 @@ func (s *Server) handleAdminCreateChallenge(c echo.Context) error {
 		ch.DeployConfig = "{}"
 	}
 	id, err := s.db.InsertGetID(
-		`INSERT INTO challenges (name, description, category, points, flag, flag_type, deploy_type, deploy_backend, deploy_config, image, vm_template, is_visible) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
-		ch.Name, ch.Description, ch.Category, ch.Points, ch.Flag, ch.FlagType, ch.DeployType, ch.DeployBackend, ch.DeployConfig, ch.Image, ch.VMTemplate, ch.IsVisible,
+		`INSERT INTO challenges (name, description, category, points, flag, flag_type, deploy_type, deploy_backend, deploy_config, image, vm_template, is_visible, connection_info, max_attempts) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		ch.Name, ch.Description, ch.Category, ch.Points, ch.Flag, ch.FlagType, ch.DeployType, ch.DeployBackend, ch.DeployConfig, ch.Image, ch.VMTemplate, ch.IsVisible, ch.ConnectionInfo, ch.MaxAttempts,
 	)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error: " + err.Error()})
@@ -319,8 +348,8 @@ func (s *Server) handleAdminUpdateChallenge(c echo.Context) error {
 		ch.DeployConfig = "{}"
 	}
 	_, err = s.db.Exec(
-		`UPDATE challenges SET name=?, description=?, category=?, points=?, flag=?, flag_type=?, deploy_type=?, deploy_backend=?, deploy_config=?, image=?, vm_template=?, is_visible=? WHERE id=?`,
-		ch.Name, ch.Description, ch.Category, ch.Points, ch.Flag, ch.FlagType, ch.DeployType, ch.DeployBackend, ch.DeployConfig, ch.Image, ch.VMTemplate, ch.IsVisible, id,
+		`UPDATE challenges SET name=?, description=?, category=?, points=?, flag=?, flag_type=?, deploy_type=?, deploy_backend=?, deploy_config=?, image=?, vm_template=?, is_visible=?, connection_info=?, max_attempts=? WHERE id=?`,
+		ch.Name, ch.Description, ch.Category, ch.Points, ch.Flag, ch.FlagType, ch.DeployType, ch.DeployBackend, ch.DeployConfig, ch.Image, ch.VMTemplate, ch.IsVisible, ch.ConnectionInfo, ch.MaxAttempts, id,
 	)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error: " + err.Error()})
@@ -339,4 +368,293 @@ func (s *Server) handleAdminDeleteChallenge(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
 	}
 	return c.JSON(http.StatusOK, map[string]string{"message": "deleted"})
+}
+
+// ─── Challenge Flags ─────────────────────────────────────────────────────────
+
+func (s *Server) handleAdminListChallengeFlags(c echo.Context) error {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid id"})
+	}
+	rows, err := s.db.Query(`SELECT id, challenge_id, content, type, data FROM challenge_flags WHERE challenge_id=? ORDER BY id`, id)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
+	}
+	defer rows.Close()
+	var flags []models.ChallengeFlag
+	for rows.Next() {
+		var f models.ChallengeFlag
+		if err := rows.Scan(&f.ID, &f.ChallengeID, &f.Content, &f.Type, &f.Data); err != nil {
+			continue
+		}
+		flags = append(flags, f)
+	}
+	if flags == nil {
+		flags = []models.ChallengeFlag{}
+	}
+	return c.JSON(http.StatusOK, flags)
+}
+
+func (s *Server) handleAdminCreateChallengeFlag(c echo.Context) error {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid id"})
+	}
+	var req struct {
+		Content string `json:"content"`
+		Type    string `json:"type"`
+		Data    string `json:"data"`
+	}
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
+	}
+	if req.Type == "" {
+		req.Type = "exact"
+	}
+	fid, err := s.db.InsertGetID(
+		`INSERT INTO challenge_flags (challenge_id, content, type, data) VALUES (?, ?, ?, ?)`,
+		id, req.Content, req.Type, req.Data,
+	)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
+	}
+	return c.JSON(http.StatusCreated, models.ChallengeFlag{ID: fid, ChallengeID: id, Content: req.Content, Type: req.Type, Data: req.Data})
+}
+
+func (s *Server) handleAdminDeleteChallengeFlag(c echo.Context) error {
+	fid, err := strconv.ParseInt(c.Param("fid"), 10, 64)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid id"})
+	}
+	if _, err := s.db.Exec(`DELETE FROM challenge_flags WHERE id=?`, fid); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
+	}
+	return c.JSON(http.StatusOK, map[string]string{"message": "deleted"})
+}
+
+// ─── Challenge Hints ──────────────────────────────────────────────────────────
+
+func (s *Server) handleAdminListChallengeHints(c echo.Context) error {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid id"})
+	}
+	rows, err := s.db.Query(`SELECT id, challenge_id, content, cost, sort_order FROM challenge_hints WHERE challenge_id=? ORDER BY sort_order, id`, id)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
+	}
+	defer rows.Close()
+	var hints []models.ChallengeHint
+	for rows.Next() {
+		var h models.ChallengeHint
+		if err := rows.Scan(&h.ID, &h.ChallengeID, &h.Content, &h.Cost, &h.SortOrder); err != nil {
+			continue
+		}
+		hints = append(hints, h)
+	}
+	if hints == nil {
+		hints = []models.ChallengeHint{}
+	}
+	return c.JSON(http.StatusOK, hints)
+}
+
+func (s *Server) handleAdminCreateChallengeHint(c echo.Context) error {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid id"})
+	}
+	var req struct {
+		Content   string `json:"content"`
+		Cost      int    `json:"cost"`
+		SortOrder int    `json:"sort_order"`
+	}
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
+	}
+	hid, err := s.db.InsertGetID(
+		`INSERT INTO challenge_hints (challenge_id, content, cost, sort_order) VALUES (?, ?, ?, ?)`,
+		id, req.Content, req.Cost, req.SortOrder,
+	)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
+	}
+	return c.JSON(http.StatusCreated, models.ChallengeHint{ID: hid, ChallengeID: id, Content: req.Content, Cost: req.Cost, SortOrder: req.SortOrder})
+}
+
+func (s *Server) handleAdminDeleteChallengeHint(c echo.Context) error {
+	hid, err := strconv.ParseInt(c.Param("hid"), 10, 64)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid id"})
+	}
+	if _, err := s.db.Exec(`DELETE FROM challenge_hints WHERE id=?`, hid); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
+	}
+	return c.JSON(http.StatusOK, map[string]string{"message": "deleted"})
+}
+
+func (s *Server) handleListChallengeHints(c echo.Context) error {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid id"})
+	}
+	rows, err := s.db.Query(`SELECT id, challenge_id, cost, sort_order FROM challenge_hints WHERE challenge_id=? ORDER BY sort_order, id`, id)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
+	}
+	defer rows.Close()
+	type HintPublic struct {
+		ID          int64 `json:"id"`
+		ChallengeID int64 `json:"challenge_id"`
+		Cost        int   `json:"cost"`
+		SortOrder   int   `json:"sort_order"`
+	}
+	var hints []HintPublic
+	for rows.Next() {
+		var h HintPublic
+		if err := rows.Scan(&h.ID, &h.ChallengeID, &h.Cost, &h.SortOrder); err != nil {
+			continue
+		}
+		hints = append(hints, h)
+	}
+	if hints == nil {
+		hints = []HintPublic{}
+	}
+	return c.JSON(http.StatusOK, hints)
+}
+
+// ─── Challenge Files ──────────────────────────────────────────────────────────
+
+func (s *Server) handleAdminListChallengeFiles(c echo.Context) error {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid id"})
+	}
+	rows, err := s.db.Query(`SELECT id, challenge_id, name, location, size FROM challenge_files WHERE challenge_id=? ORDER BY id`, id)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
+	}
+	defer rows.Close()
+	var files []models.ChallengeFile
+	for rows.Next() {
+		var f models.ChallengeFile
+		if err := rows.Scan(&f.ID, &f.ChallengeID, &f.Name, &f.Location, &f.Size); err != nil {
+			continue
+		}
+		files = append(files, f)
+	}
+	if files == nil {
+		files = []models.ChallengeFile{}
+	}
+	return c.JSON(http.StatusOK, files)
+}
+
+func (s *Server) handleAdminUploadFile(c echo.Context) error {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid id"})
+	}
+	file, err := c.FormFile("file")
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "file required"})
+	}
+	src, err := file.Open()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "cannot open file"})
+	}
+	defer src.Close()
+
+	// Validate file extension against an allowlist of safe types
+	ext := strings.ToLower(filepath.Ext(file.Filename))
+	allowedExts := map[string]bool{
+		".zip": true, ".tar": true, ".gz": true, ".7z": true, ".rar": true,
+		".pdf": true, ".txt": true, ".md": true,
+		".png": true, ".jpg": true, ".jpeg": true, ".gif": true, ".svg": true,
+		".py": true, ".c": true, ".cpp": true, ".go": true, ".js": true, ".ts": true,
+		".json": true, ".yaml": true, ".yml": true, ".xml": true,
+		".pcap": true, ".pcapng": true, ".cap": true,
+		".bin": true, ".elf": true, ".out": true,
+	}
+	if ext != "" && !allowedExts[ext] {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "file type not allowed"})
+	}
+
+	randBytes := make([]byte, 16)
+	if _, err := crand.Read(randBytes); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "internal error"})
+	}
+	uniqueName := hex.EncodeToString(randBytes) + ext
+
+	uploadsDir := filepath.Join(s.cfg.Server.StaticDir, "static", "uploads")
+	if err := os.MkdirAll(uploadsDir, 0755); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "cannot create uploads dir"})
+	}
+
+	dst, err := os.Create(filepath.Join(uploadsDir, uniqueName))
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "cannot create file"})
+	}
+	defer dst.Close()
+
+	size, err := io.Copy(dst, src)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "cannot write file"})
+	}
+
+	location := "/static/uploads/" + uniqueName
+	fid, err := s.db.InsertGetID(
+		`INSERT INTO challenge_files (challenge_id, name, location, size) VALUES (?, ?, ?, ?)`,
+		id, file.Filename, location, size,
+	)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
+	}
+	return c.JSON(http.StatusCreated, models.ChallengeFile{
+		ID: fid, ChallengeID: id, Name: file.Filename, Location: location, Size: size,
+	})
+}
+
+func (s *Server) handleAdminDeleteChallengeFile(c echo.Context) error {
+	fid, err := strconv.ParseInt(c.Param("fid"), 10, 64)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid id"})
+	}
+	var location string
+	_ = s.db.QueryRow(`SELECT location FROM challenge_files WHERE id=?`, fid).Scan(&location)
+	if _, err := s.db.Exec(`DELETE FROM challenge_files WHERE id=?`, fid); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
+	}
+	if location != "" {
+		physPath := filepath.Join(s.cfg.Server.StaticDir, location)
+		_ = os.Remove(physPath)
+	}
+	return c.JSON(http.StatusOK, map[string]string{"message": "deleted"})
+}
+
+func (s *Server) handleListChallengeFiles(c echo.Context) error {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid id"})
+	}
+	rows, err := s.db.Query(`SELECT id, challenge_id, name, location, size FROM challenge_files WHERE challenge_id=? ORDER BY id`, id)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
+	}
+	defer rows.Close()
+	var files []models.ChallengeFile
+	for rows.Next() {
+		var f models.ChallengeFile
+		if err := rows.Scan(&f.ID, &f.ChallengeID, &f.Name, &f.Location, &f.Size); err != nil {
+			continue
+		}
+		files = append(files, f)
+	}
+	if files == nil {
+		files = []models.ChallengeFile{}
+	}
+	return c.JSON(http.StatusOK, files)
+}
+
+func (s *Server) handleChallengeTypes(c echo.Context) error {
+	return c.JSON(http.StatusOK, plugin.Default.ChallengeTypeNames())
 }

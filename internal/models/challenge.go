@@ -16,6 +16,8 @@ type Challenge struct {
 	Image         string    `json:"image" db:"image"`
 	VMTemplate    int       `json:"vm_template" db:"vm_template"`
 	IsVisible     bool      `json:"is_visible" db:"is_visible"`
+	ConnectionInfo string `json:"connection_info" db:"connection_info"`
+	MaxAttempts   int    `json:"max_attempts" db:"max_attempts"`
 	CreatedAt     time.Time `json:"created_at" db:"created_at"`
 	SolveCount    int       `json:"solve_count,omitempty"`
 	Solved        bool      `json:"solved,omitempty"`

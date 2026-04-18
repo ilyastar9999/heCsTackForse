@@ -341,3 +341,147 @@ a:hover { color: #ff6b6b; }
 .round-number { font-size: 3rem; font-weight: 800; color: var(--ctf-accent); }
 .round-timer  { font-size: 1.5rem; font-family: monospace; color: var(--ctf-text); }
 
+/* ── Notification cards ── */
+.notification-card {
+  background: var(--ctf-surface);
+  border: 1px solid var(--ctf-border);
+  border-left: 4px solid var(--ctf-accent);
+  border-radius: var(--ctf-radius);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1rem;
+  box-shadow: var(--ctf-shadow);
+  transition: border-color .2s, transform .15s;
+}
+.notification-card:hover {
+  border-left-color: #ff6b6b;
+  transform: translateX(3px);
+}
+.notification-card .notif-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: .35rem;
+  color: var(--ctf-text);
+}
+.notification-card .notif-date {
+  font-size: .78rem;
+  color: var(--ctf-muted);
+  margin-bottom: .5rem;
+}
+.notification-card .notif-content {
+  color: var(--ctf-text);
+  white-space: pre-wrap;
+}
+
+/* ── Statistics cards ── */
+.stat-card {
+  background: var(--ctf-surface);
+  border: 1px solid var(--ctf-border);
+  border-radius: var(--ctf-radius);
+  padding: 1.5rem;
+  text-align: center;
+  box-shadow: var(--ctf-shadow);
+  transition: transform .2s, box-shadow .2s;
+}
+.stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 24px rgba(233,69,96,.2);
+}
+.stat-card .stat-value {
+  font-size: 2.5rem;
+  font-weight: 900;
+  color: var(--ctf-accent);
+  line-height: 1;
+  margin-bottom: .4rem;
+}
+.stat-card .stat-label {
+  font-size: .85rem;
+  color: var(--ctf-muted);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+/* ── File & hint items ── */
+.file-item {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  padding: .4rem .75rem;
+  background: rgba(15,123,160,.08);
+  border: 1px solid rgba(15,123,160,.25);
+  border-radius: var(--ctf-radius);
+  margin-bottom: .4rem;
+  font-size: .875rem;
+}
+.file-item a { color: #7cf; text-decoration: none; flex: 1; }
+.file-item a:hover { color: #adf; text-decoration: underline; }
+.file-item .file-icon { color: var(--ctf-muted); }
+
+.hint-item {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  padding: .5rem .75rem;
+  background: rgba(255,193,7,.06);
+  border: 1px solid rgba(255,193,7,.2);
+  border-radius: var(--ctf-radius);
+  margin-bottom: .4rem;
+  font-size: .875rem;
+}
+.hint-item .hint-cost {
+  font-size: .75rem;
+  font-weight: 700;
+  color: var(--ctf-yellow);
+  background: rgba(255,193,7,.1);
+  border: 1px solid rgba(255,193,7,.3);
+  border-radius: 3px;
+  padding: .1rem .4rem;
+  white-space: nowrap;
+}
+
+/* ── Tag badge ── */
+.tag-badge {
+  display: inline-block;
+  background: rgba(233,69,96,.12);
+  color: var(--ctf-accent);
+  border: 1px solid rgba(233,69,96,.25);
+  border-radius: 4px;
+  font-size: .72rem;
+  padding: .15rem .5rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin: .1rem;
+}
+
+/* ── Bell indicator ── */
+.bell-indicator {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.bell-indicator .badge-dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 8px;
+  height: 8px;
+  background: var(--ctf-accent);
+  border-radius: 50%;
+  border: 1px solid var(--ctf-surface);
+}
+
+/* ── Connection info block ── */
+.connection-info-block {
+  background: #0d1b2a;
+  border: 1px solid rgba(15,123,160,.4);
+  border-radius: var(--ctf-radius);
+  padding: .6rem 1rem;
+  font-family: monospace;
+  font-size: .9rem;
+  color: #7cf;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+

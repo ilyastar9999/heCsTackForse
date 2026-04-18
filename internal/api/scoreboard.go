@@ -27,7 +27,7 @@ func (s *Server) handleUserScoreboard(c echo.Context) error {
 	rows, err := s.db.Query(
 		`SELECT u.id, u.username, u.role, u.score, u.created_at,
 		(SELECT COUNT(*) FROM submissions WHERE user_id=u.id AND is_correct=1) as solves
-		FROM users u ORDER BY u.score DESC, u.created_at ASC LIMIT 100`,
+		FROM users u WHERE u.hidden=0 ORDER BY u.score DESC, u.created_at ASC LIMIT 100`,
 	)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})

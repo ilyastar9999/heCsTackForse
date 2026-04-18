@@ -45,9 +45,18 @@
       <li class="nav-item">
         <a class="nav-link" href="#" onclick="showTab('users',this)" data-i18n="admin.users">Users</a>
       </li>
+      <li class="nav-item">
+        <a class="nav-link" href="#" onclick="showTab('notifications',this)" data-i18n="admin.notifications">Notifications</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="#" onclick="showTab('pages',this)" data-i18n="admin.pages">Pages</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="#" onclick="showTab('config',this)" data-i18n="admin.config">Config</a>
+      </li>
     </ul>
 
-    <!-- Challenges Tab -->
+    <!-- ═══ Challenges Tab ═══ -->
     <div id="tab-challenges">
       <div class="mb-3">
         <button class="btn btn-primary" onclick="openCreateChallenge()" data-i18n="admin.new_challenge">+ New Challenge</button>
@@ -64,98 +73,268 @@
       </div>
     </div>
 
-    <!-- Users Tab -->
+    <!-- ═══ Users Tab ═══ -->
     <div id="tab-users" style="display:none">
       <div class="card p-0">
         <table class="admin-table">
           <thead>
-            <tr><th>ID</th><th>Username</th><th>Email</th><th>Role</th><th>Score</th><th>Status</th><th>Actions</th></tr>
+            <tr><th>ID</th><th>Username</th><th>Email</th><th>Role</th><th>Score</th><th>Verified</th><th>Hidden</th><th>Status</th><th>Actions</th></tr>
           </thead>
           <tbody id="users-body">
-            <tr><td colspan="7" class="text-center py-3 text-muted">Loading…</td></tr>
+            <tr><td colspan="9" class="text-center py-3 text-muted">Loading…</td></tr>
           </tbody>
         </table>
       </div>
     </div>
+
+    <!-- ═══ Notifications Tab ═══ -->
+    <div id="tab-notifications" style="display:none">
+      <div class="row g-4">
+        <div class="col-md-5">
+          <div class="card p-4">
+            <h5 class="mb-3" data-i18n="notifications.new">New Notification</h5>
+            <div class="mb-3">
+              <label class="form-label" data-i18n="notifications.title_label">Title</label>
+              <input type="text" class="form-control" id="notif-title">
+            </div>
+            <div class="mb-3">
+              <label class="form-label" data-i18n="notifications.content_label">Content</label>
+              <textarea class="form-control" id="notif-content" rows="4"></textarea>
+            </div>
+            <button class="btn btn-primary" onclick="createNotification()" data-i18n="notifications.create">Create</button>
+          </div>
+        </div>
+        <div class="col-md-7">
+          <div id="notif-list-container">
+            <div class="text-muted text-center py-4">Loading…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ Pages Tab ═══ -->
+    <div id="tab-pages" style="display:none">
+      <div class="row g-4">
+        <div class="col-md-5">
+          <div class="card p-4">
+            <h5 class="mb-3" id="page-form-title" data-i18n="pages.new">New Page</h5>
+            <input type="hidden" id="page-id">
+            <div class="mb-3">
+              <label class="form-label" data-i18n="pages.title_label">Title</label>
+              <input type="text" class="form-control" id="page-title">
+            </div>
+            <div class="mb-3">
+              <label class="form-label" data-i18n="pages.slug_label">Slug</label>
+              <input type="text" class="form-control" id="page-slug" placeholder="e.g. about">
+            </div>
+            <div class="mb-3">
+              <label class="form-label" data-i18n="pages.content_label">Content (HTML)</label>
+              <textarea class="form-control" id="page-content" rows="6"></textarea>
+            </div>
+            <div class="form-check mb-3">
+              <input class="form-check-input" type="checkbox" id="page-draft">
+              <label class="form-check-label" for="page-draft" data-i18n="pages.draft_label">Draft</label>
+            </div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-primary" onclick="savePage()" data-i18n="pages.save">Save Page</button>
+              <button class="btn btn-secondary" onclick="resetPageForm()" data-i18n="admin.cancel">Cancel</button>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-7">
+          <div id="pages-list-container">
+            <div class="text-muted text-center py-4">Loading…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ Config Tab ═══ -->
+    <div id="tab-config" style="display:none">
+      <div class="row g-4">
+        <div class="col-md-6">
+          <div class="card p-4 mb-4">
+            <h5 class="mb-3" data-i18n="admin.config">General Settings</h5>
+            <div class="mb-3">
+              <label class="form-label" data-i18n="admin.ctf_name">CTF Name</label>
+              <input type="text" class="form-control" id="cfg-name">
+            </div>
+            <div class="mb-3">
+              <label class="form-label" data-i18n="admin.ctf_description">CTF Description</label>
+              <textarea class="form-control" id="cfg-description" rows="3"></textarea>
+            </div>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" id="cfg-reg-open">
+              <label class="form-check-label" for="cfg-reg-open" data-i18n="admin.registration_open">Registration Open</label>
+            </div>
+            <div class="form-check mb-3">
+              <input class="form-check-input" type="checkbox" id="cfg-team-mode">
+              <label class="form-check-label" for="cfg-team-mode" data-i18n="admin.team_mode">Team Mode</label>
+            </div>
+            <div id="cfg-error" class="alert alert-danger d-none"></div>
+            <div id="cfg-success" class="alert alert-success d-none"></div>
+            <button class="btn btn-primary" onclick="saveConfig()" data-i18n="admin.config_save">Save Config</button>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card p-4">
+            <h5 class="mb-3">Theme</h5>
+            <label class="form-label" data-i18n="admin.theme_vars">CSS Variables (JSON)</label>
+            <textarea class="form-control font-monospace" id="theme-vars" rows="10" style="font-size:.82rem">{}</textarea>
+            <div id="theme-error" class="alert alert-danger d-none mt-2"></div>
+            <div id="theme-success" class="alert alert-success d-none mt-2"></div>
+            <button class="btn btn-primary mt-3" onclick="saveTheme()" data-i18n="admin.theme_save">Save Theme</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <!-- Challenge Modal -->
+  <!-- ═══════════════════════ Challenge Modal ═══════════════════════ -->
   <div class="modal fade" id="ch-modal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title" id="ch-modal-title">New Challenge</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
+          <ul class="nav nav-tabs mb-3" id="ch-tabs">
+            <li class="nav-item"><a class="nav-link active" href="#" onclick="showChTab('basic',this)">Basic</a></li>
+            <li class="nav-item"><a class="nav-link" href="#" onclick="showChTab('flags',this)">Flags</a></li>
+            <li class="nav-item"><a class="nav-link" href="#" onclick="showChTab('hints',this)">Hints</a></li>
+            <li class="nav-item"><a class="nav-link" href="#" onclick="showChTab('files',this)">Files</a></li>
+          </ul>
+
           <form id="ch-form" onsubmit="saveChallengeForm(event)">
             <input type="hidden" id="ch-id">
-            <div class="row g-3 mb-3">
-              <div class="col-md-6">
-                <label class="form-label">Name</label>
-                <input type="text" class="form-control" id="ch-name" required>
+
+            <!-- Basic tab -->
+            <div id="chtab-basic">
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <label class="form-label">Name</label>
+                  <input type="text" class="form-control" id="ch-name" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Category</label>
+                  <input type="text" class="form-control" id="ch-category" required>
+                </div>
               </div>
-              <div class="col-md-6">
-                <label class="form-label">Category</label>
-                <input type="text" class="form-control" id="ch-category" required>
+              <div class="mb-3">
+                <label class="form-label">Description</label>
+                <textarea class="form-control" id="ch-description" rows="4" required></textarea>
+              </div>
+              <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                  <label class="form-label">Points</label>
+                  <input type="number" class="form-control" id="ch-points" value="100" required>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label" data-i18n="admin.max_attempts">Max Attempts (0 = unlimited)</label>
+                  <input type="number" class="form-control" id="ch-max-attempts" value="0" min="0">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Flag Type / Checker</label>
+                  <select class="form-select" id="ch-flag-type">
+                    <option value="exact">Exact (static)</option>
+                    <option value="regex">Regex</option>
+                    <option value="case_insensitive">Case-Insensitive</option>
+                    <option value="prefix">Prefix</option>
+                  </select>
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Flag (primary)</label>
+                <input type="text" class="form-control" id="ch-flag">
+              </div>
+              <div class="mb-3">
+                <label class="form-label" data-i18n="admin.connection_info">Connection Info</label>
+                <textarea class="form-control font-monospace" id="ch-connection-info" rows="2" placeholder="nc host 1234"></textarea>
+              </div>
+              <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                  <label class="form-label">Deploy Type</label>
+                  <select class="form-select" id="ch-deploy-type">
+                    <option value="no_deploy">No Deploy</option>
+                    <option value="single_instance">Single Instance</option>
+                    <option value="per_user">Per User</option>
+                    <option value="attack_defence">Attack &amp; Defence</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Deploy Backend</label>
+                  <select class="form-select" id="ch-deploy-backend">
+                    <option value="">None</option>
+                    <option value="docker">Docker</option>
+                    <option value="kubernetes">Kubernetes</option>
+                    <option value="pve">Proxmox VE</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Image</label>
+                  <input type="text" class="form-control" id="ch-image" placeholder="docker image">
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Deploy Config (JSON)</label>
+                <textarea class="form-control" id="ch-deploy-config" rows="2">{}</textarea>
+              </div>
+              <div class="form-check mb-3">
+                <input class="form-check-input" type="checkbox" id="ch-visible" checked>
+                <label class="form-check-label" for="ch-visible">Visible to players</label>
               </div>
             </div>
-            <div class="mb-3">
-              <label class="form-label">Description</label>
-              <textarea class="form-control" id="ch-description" rows="4" required></textarea>
-            </div>
-            <div class="row g-3 mb-3">
-              <div class="col-md-6">
-                <label class="form-label">Points</label>
-                <input type="number" class="form-control" id="ch-points" value="100" required>
-              </div>
-              <div class="col-md-6">
-                <label class="form-label">Flag</label>
-                <input type="text" class="form-control" id="ch-flag" required>
-              </div>
-            </div>
-            <div class="row g-3 mb-3">
-              <div class="col-md-4">
-                <label class="form-label">Flag Type / Checker</label>
-                <select class="form-select" id="ch-flag-type">
-                  <option value="exact">Exact (static)</option>
-                  <option value="regex">Regex</option>
-                  <option value="case_insensitive">Case-Insensitive</option>
-                  <option value="prefix">Prefix</option>
-                </select>
-              </div>
-              <div class="col-md-4">
-                <label class="form-label">Deploy Type</label>
-                <select class="form-select" id="ch-deploy-type">
-                  <option value="no_deploy">No Deploy</option>
-                  <option value="single_instance">Single Instance</option>
-                  <option value="per_user">Per User</option>
-                  <option value="attack_defence">Attack &amp; Defence</option>
-                </select>
-              </div>
-              <div class="col-md-4">
-                <label class="form-label">Deploy Backend</label>
-                <select class="form-select" id="ch-deploy-backend">
-                  <option value="">None</option>
-                  <option value="docker">Docker</option>
-                  <option value="kubernetes">Kubernetes</option>
-                  <option value="pve">Proxmox VE</option>
-                </select>
+
+            <!-- Flags tab -->
+            <div id="chtab-flags" style="display:none">
+              <div class="alert alert-info" data-i18n="admin.flags_note" id="flags-note">Flags can be managed after the challenge is saved.</div>
+              <div id="flags-list" class="mb-3"></div>
+              <div class="row g-2 mb-2">
+                <div class="col-md-8">
+                  <input type="text" class="form-control" id="new-flag-content" placeholder="FLAG{...}">
+                </div>
+                <div class="col-md-2">
+                  <select class="form-select" id="new-flag-type">
+                    <option value="exact">Exact</option>
+                    <option value="regex">Regex</option>
+                    <option value="case_insensitive">Case-Insensitive</option>
+                  </select>
+                </div>
+                <div class="col-md-2">
+                  <button type="button" class="btn btn-primary w-100" onclick="addFlag()" data-i18n="admin.add_flag">Add Flag</button>
+                </div>
               </div>
             </div>
-            <div class="mb-3">
-              <label class="form-label">Image</label>
-              <input type="text" class="form-control" id="ch-image" placeholder="docker image or leave blank">
+
+            <!-- Hints tab -->
+            <div id="chtab-hints" style="display:none">
+              <div class="alert alert-info" id="hints-note">Hints can be managed after the challenge is saved.</div>
+              <div id="hints-list" class="mb-3"></div>
+              <div class="row g-2 mb-2">
+                <div class="col-md-6">
+                  <input type="text" class="form-control" id="new-hint-content" placeholder="Hint text…">
+                </div>
+                <div class="col-md-2">
+                  <input type="number" class="form-control" id="new-hint-cost" value="0" min="0" placeholder="Cost">
+                </div>
+                <div class="col-md-4">
+                  <button type="button" class="btn btn-primary w-100" onclick="addHint()" data-i18n="admin.add_hint">Add Hint</button>
+                </div>
+              </div>
             </div>
-            <div class="mb-3">
-              <label class="form-label">Deploy Config (JSON)</label>
-              <textarea class="form-control" id="ch-deploy-config" rows="2">{}</textarea>
+
+            <!-- Files tab -->
+            <div id="chtab-files" style="display:none">
+              <div class="alert alert-info" id="files-note">Files can be managed after the challenge is saved.</div>
+              <div id="files-list" class="mb-3"></div>
+              <div class="d-flex gap-2 align-items-center">
+                <input type="file" class="form-control" id="file-upload" multiple>
+                <button type="button" class="btn btn-primary" onclick="uploadFiles()">Upload</button>
+              </div>
             </div>
-            <div class="form-check mb-3">
-              <input class="form-check-input" type="checkbox" id="ch-visible" checked>
-              <label class="form-check-label" for="ch-visible">Visible to players</label>
-            </div>
-            <div id="ch-error" class="alert alert-danger d-none"></div>
+
+            <div id="ch-error" class="alert alert-danger d-none mt-3"></div>
           </form>
         </div>
         <div class="modal-footer">
@@ -171,21 +350,44 @@
   <script src="/static/js/i18n.js"></script>
   <script>
     let chBsModal = null;
+    let _currentChId = null;
+
+    function escHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
 
     async function logout() {
       await apiFetch('/api/auth/logout', { method: 'POST' });
       location.href = '/login';
     }
 
+    // ── Tab management ──
     function showTab(name, el) {
       document.querySelectorAll('[id^="tab-"]').forEach(t => t.style.display = 'none');
-      document.querySelectorAll('.nav-tabs .nav-link').forEach(l => l.classList.remove('active'));
+      document.querySelectorAll('.nav-tabs:not(#ch-tabs) .nav-link').forEach(l => l.classList.remove('active'));
       document.getElementById('tab-' + name).style.display = '';
       el.classList.add('active');
-      if (name === 'challenges') loadAdminChallenges();
-      else if (name === 'users') loadAdminUsers();
+      if (name === 'challenges')    loadAdminChallenges();
+      else if (name === 'users')    loadAdminUsers();
+      else if (name === 'notifications') loadAdminNotifications();
+      else if (name === 'pages')    loadAdminPages();
+      else if (name === 'config')   loadAdminConfig();
     }
 
+    function showChTab(name, el) {
+      ['basic','flags','hints','files'].forEach(n => {
+        document.getElementById('chtab-' + n).style.display = n === name ? '' : 'none';
+      });
+      document.querySelectorAll('#ch-tabs .nav-link').forEach(l => l.classList.remove('active'));
+      el.classList.add('active');
+      if (name === 'flags' && _currentChId) loadFlags(_currentChId);
+      if (name === 'hints' && _currentChId) loadHints(_currentChId);
+      if (name === 'files' && _currentChId) loadAdminFiles(_currentChId);
+    }
+
+    // ══════════════════════════════════════
+    // CHALLENGES
+    // ══════════════════════════════════════
     async function loadAdminChallenges() {
       const challenges = await apiFetch('/api/admin/challenges');
       document.getElementById('challenges-body').innerHTML = challenges.map(c => `
@@ -204,12 +406,230 @@
         </tr>`).join('');
     }
 
+    function openCreateChallenge() {
+      _currentChId = null;
+      document.getElementById('ch-modal-title').textContent = 'New Challenge';
+      document.getElementById('ch-form').reset();
+      document.getElementById('ch-id').value = '';
+      document.getElementById('ch-deploy-config').value = '{}';
+      document.getElementById('ch-visible').checked = true;
+      document.getElementById('ch-error').classList.add('d-none');
+      document.getElementById('flags-note').style.display = '';
+      document.getElementById('hints-note').style.display = '';
+      document.getElementById('files-note').style.display = '';
+      document.getElementById('flags-list').innerHTML = '';
+      document.getElementById('hints-list').innerHTML = '';
+      document.getElementById('files-list').innerHTML = '';
+      showChTab('basic', document.querySelector('#ch-tabs .nav-link'));
+      if (!chBsModal) chBsModal = new bootstrap.Modal(document.getElementById('ch-modal'));
+      chBsModal.show();
+    }
+
+    function editChallenge(c) {
+      _currentChId = c.id;
+      document.getElementById('ch-modal-title').textContent = 'Edit Challenge';
+      document.getElementById('ch-id').value          = c.id;
+      document.getElementById('ch-name').value         = c.name;
+      document.getElementById('ch-category').value     = c.category;
+      document.getElementById('ch-description').value  = c.description;
+      document.getElementById('ch-points').value       = c.points;
+      document.getElementById('ch-flag').value         = c.flag || '';
+      document.getElementById('ch-flag-type').value    = (c.flag_type === 'static') ? 'exact' : (c.flag_type || 'exact');
+      document.getElementById('ch-max-attempts').value = c.max_attempts || 0;
+      document.getElementById('ch-connection-info').value = c.connection_info || '';
+      document.getElementById('ch-deploy-type').value  = c.deploy_type;
+      document.getElementById('ch-deploy-backend').value = c.deploy_backend || '';
+      document.getElementById('ch-image').value        = c.image || '';
+      document.getElementById('ch-deploy-config').value = c.deploy_config || '{}';
+      document.getElementById('ch-visible').checked    = c.is_visible;
+      document.getElementById('ch-error').classList.add('d-none');
+      // hide new-challenge-only notes
+      document.getElementById('flags-note').style.display = 'none';
+      document.getElementById('hints-note').style.display = 'none';
+      document.getElementById('files-note').style.display = 'none';
+      showChTab('basic', document.querySelector('#ch-tabs .nav-link'));
+      if (!chBsModal) chBsModal = new bootstrap.Modal(document.getElementById('ch-modal'));
+      chBsModal.show();
+    }
+
+    async function saveChallengeForm(e) {
+      e.preventDefault();
+      const id = document.getElementById('ch-id').value;
+      const body = {
+        name:            document.getElementById('ch-name').value,
+        category:        document.getElementById('ch-category').value,
+        description:     document.getElementById('ch-description').value,
+        points:          parseInt(document.getElementById('ch-points').value),
+        flag:            document.getElementById('ch-flag').value,
+        flag_type:       document.getElementById('ch-flag-type').value,
+        max_attempts:    parseInt(document.getElementById('ch-max-attempts').value) || 0,
+        connection_info: document.getElementById('ch-connection-info').value,
+        deploy_type:     document.getElementById('ch-deploy-type').value,
+        deploy_backend:  document.getElementById('ch-deploy-backend').value,
+        image:           document.getElementById('ch-image').value,
+        deploy_config:   document.getElementById('ch-deploy-config').value,
+        is_visible:      document.getElementById('ch-visible').checked,
+      };
+      const errEl = document.getElementById('ch-error');
+      errEl.classList.add('d-none');
+      try {
+        let saved;
+        if (id) {
+          saved = await apiFetch('/api/admin/challenges/' + id, { method: 'PUT', body: JSON.stringify(body) });
+          _currentChId = id;
+        } else {
+          saved = await apiFetch('/api/admin/challenges', { method: 'POST', body: JSON.stringify(body) });
+          _currentChId = saved.id;
+          document.getElementById('ch-id').value = saved.id;
+          document.getElementById('flags-note').style.display = 'none';
+          document.getElementById('hints-note').style.display = 'none';
+          document.getElementById('files-note').style.display = 'none';
+        }
+        loadAdminChallenges();
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.classList.remove('d-none');
+      }
+    }
+
+    async function deleteChallenge(id) {
+      if (!confirm('Delete challenge ' + id + '?')) return;
+      await apiFetch('/api/admin/challenges/' + id, { method: 'DELETE' });
+      loadAdminChallenges();
+    }
+
+    // ── Flags ──
+    async function loadFlags(challengeId) {
+      const container = document.getElementById('flags-list');
+      try {
+        const flags = await apiFetch('/api/admin/challenges/' + challengeId + '/flags');
+        if (!flags || !flags.length) {
+          container.innerHTML = '<p class="text-muted small">No flags yet.</p>';
+          return;
+        }
+        container.innerHTML = flags.map(f => `
+          <div class="hint-item d-flex justify-content-between align-items-center">
+            <div><code style="color:var(--ctf-text)">${escHtml(f.content)}</code> <span class="tag ms-2">${escHtml(f.type)}</span></div>
+            <button type="button" class="btn btn-sm btn-danger" onclick="deleteFlag(${parseInt(challengeId)},${parseInt(f.id)})">✕</button>
+          </div>`).join('');
+      } catch (err) {
+        container.innerHTML = `<div class="text-danger small">${escHtml(err.message)}</div>`;
+      }
+    }
+
+    async function addFlag() {
+      if (!_currentChId) { alert('Save the challenge first.'); return; }
+      const content = document.getElementById('new-flag-content').value.trim();
+      const type    = document.getElementById('new-flag-type').value;
+      if (!content) return;
+      try {
+        await apiFetch('/api/admin/challenges/' + _currentChId + '/flags', {
+          method: 'POST', body: JSON.stringify({ content, type }),
+        });
+        document.getElementById('new-flag-content').value = '';
+        loadFlags(_currentChId);
+      } catch (err) { alert(err.message); }
+    }
+
+    async function deleteFlag(cid, fid) {
+      if (!confirm('Delete this flag?')) return;
+      await apiFetch('/api/admin/challenges/' + cid + '/flags/' + fid, { method: 'DELETE' });
+      loadFlags(cid);
+    }
+
+    // ── Hints ──
+    async function loadHints(challengeId) {
+      const container = document.getElementById('hints-list');
+      try {
+        const hints = await apiFetch('/api/admin/challenges/' + challengeId + '/hints');
+        if (!hints || !hints.length) {
+          container.innerHTML = '<p class="text-muted small">No hints yet.</p>';
+          return;
+        }
+        container.innerHTML = hints.map(h => `
+          <div class="hint-item d-flex justify-content-between align-items-center">
+            <div>
+              <span class="hint-cost">${parseInt(h.cost) > 0 ? parseInt(h.cost) + ' pts' : 'Free'}</span>
+              <span class="ms-2">${escHtml(h.content)}</span>
+            </div>
+            <button type="button" class="btn btn-sm btn-danger" onclick="deleteHint(${parseInt(challengeId)},${parseInt(h.id)})">✕</button>
+          </div>`).join('');
+      } catch (err) {
+        container.innerHTML = `<div class="text-danger small">${escHtml(err.message)}</div>`;
+      }
+    }
+
+    async function addHint() {
+      if (!_currentChId) { alert('Save the challenge first.'); return; }
+      const content = document.getElementById('new-hint-content').value.trim();
+      const cost    = parseInt(document.getElementById('new-hint-cost').value) || 0;
+      if (!content) return;
+      try {
+        await apiFetch('/api/admin/challenges/' + _currentChId + '/hints', {
+          method: 'POST', body: JSON.stringify({ content, cost }),
+        });
+        document.getElementById('new-hint-content').value = '';
+        document.getElementById('new-hint-cost').value = '0';
+        loadHints(_currentChId);
+      } catch (err) { alert(err.message); }
+    }
+
+    async function deleteHint(cid, hid) {
+      if (!confirm('Delete this hint?')) return;
+      await apiFetch('/api/admin/challenges/' + cid + '/hints/' + hid, { method: 'DELETE' });
+      loadHints(cid);
+    }
+
+    // ── Files ──
+    async function loadAdminFiles(challengeId) {
+      const container = document.getElementById('files-list');
+      try {
+        const files = await apiFetch('/api/admin/challenges/' + challengeId + '/files');
+        if (!files || !files.length) {
+          container.innerHTML = '<p class="text-muted small">No files yet.</p>';
+          return;
+        }
+        container.innerHTML = files.map(f => `
+          <div class="file-item">
+            <span class="file-icon">📄</span>
+            <a href="${escHtml(f.url || f.path || '')}" target="_blank">${escHtml(f.name || f.filename || f.url || '')}</a>
+            <button type="button" class="btn btn-sm btn-danger ms-auto" onclick="deleteFile(${parseInt(challengeId)},${parseInt(f.id)})">✕</button>
+          </div>`).join('');
+      } catch (err) {
+        container.innerHTML = `<div class="text-danger small">${escHtml(err.message)}</div>`;
+      }
+    }
+
+    async function uploadFiles() {
+      if (!_currentChId) { alert('Save the challenge first.'); return; }
+      const input = document.getElementById('file-upload');
+      if (!input.files.length) return;
+      const formData = new FormData();
+      for (const file of input.files) formData.append('file', file);
+      try {
+        await fetch('/api/admin/challenges/' + _currentChId + '/files', {
+          method: 'POST', body: formData, credentials: 'same-origin',
+        });
+        input.value = '';
+        loadAdminFiles(_currentChId);
+      } catch (err) { alert(err.message); }
+    }
+
+    async function deleteFile(cid, fid) {
+      if (!confirm('Delete this file?')) return;
+      await apiFetch('/api/admin/challenges/' + cid + '/files/' + fid, { method: 'DELETE' });
+      loadAdminFiles(cid);
+    }
+
+    // ══════════════════════════════════════
+    // USERS
+    // ══════════════════════════════════════
     async function loadAdminUsers() {
       const users = await apiFetch('/api/admin/users');
       document.getElementById('users-body').innerHTML = users.map(u => `
         <tr>
           <td>${u.id}</td>
-          <td>${escHtml(u.username)}</td>
+          <td><a href="/admin/users/${u.id}" style="color:var(--ctf-accent)">${escHtml(u.username)}</a></td>
           <td>${escHtml(u.email)}</td>
           <td>
             <select class="form-select form-select-sm" onchange="updateUserRole(${u.id}, this.value, ${u.score})">
@@ -218,9 +638,10 @@
             </select>
           </td>
           <td>${u.score}</td>
+          <td>${u.verified ? '<span class="badge bg-success">✓</span>' : '<span class="badge bg-secondary">–</span>'}</td>
+          <td>${u.hidden ? '<span class="badge bg-warning text-dark">Hidden</span>' : '<span class="badge bg-secondary">–</span>'}</td>
           <td>${u.banned ? '<span class="badge bg-danger">Banned</span>' : '<span class="badge bg-success">Active</span>'}</td>
           <td class="d-flex gap-1 flex-wrap">
-            <button class="btn btn-sm btn-secondary" onclick="promptScore(${u.id}, ${u.score}, '${escHtml(u.role)}')">Score</button>
             ${u.banned
               ? `<button class="btn btn-sm btn-success" onclick="setBanned(${u.id}, false)">${t('admin.unban')}</button>`
               : `<button class="btn btn-sm btn-warning" onclick="setBanned(${u.id}, true)">${t('admin.ban')}</button>`}
@@ -232,13 +653,6 @@
 
     async function updateUserRole(id, role, score) {
       await apiFetch('/api/admin/users/' + id, { method: 'PUT', body: JSON.stringify({ role, score }) });
-    }
-
-    async function promptScore(id, currentScore, role) {
-      const score = prompt('New score:', currentScore);
-      if (score === null) return;
-      await apiFetch('/api/admin/users/' + id, { method: 'PUT', body: JSON.stringify({ role, score: parseInt(score) }) });
-      loadAdminUsers();
     }
 
     async function setBanned(id, banned) {
@@ -258,79 +672,187 @@
       loadAdminUsers();
     }
 
-    function openCreateChallenge() {
-      document.getElementById('ch-modal-title').textContent = 'New Challenge';
-      document.getElementById('ch-form').reset();
-      document.getElementById('ch-id').value = '';
-      document.getElementById('ch-deploy-config').value = '{}';
-      document.getElementById('ch-visible').checked = true;
-      document.getElementById('ch-error').classList.add('d-none');
-      if (!chBsModal) chBsModal = new bootstrap.Modal(document.getElementById('ch-modal'));
-      chBsModal.show();
+    // ══════════════════════════════════════
+    // NOTIFICATIONS
+    // ══════════════════════════════════════
+    async function loadAdminNotifications() {
+      const container = document.getElementById('notif-list-container');
+      try {
+        const notifs = await apiFetch('/api/notifications');
+        if (!notifs || !notifs.length) {
+          container.innerHTML = '<p class="text-muted text-center py-4" data-i18n="notifications.empty">No notifications yet.</p>';
+          return;
+        }
+        const sorted = [...notifs].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        container.innerHTML = sorted.map(n => `
+          <div class="notification-card d-flex justify-content-between align-items-start">
+            <div>
+              <div class="notif-title">${escHtml(n.title)}</div>
+              <div class="notif-date">${new Date(n.created_at).toLocaleString()}</div>
+              <div class="notif-content">${escHtml(n.content)}</div>
+            </div>
+            <button class="btn btn-sm btn-danger ms-3" onclick="deleteNotification(${n.id})">✕</button>
+          </div>`).join('');
+      } catch (err) {
+        container.innerHTML = `<div class="alert alert-danger">${escHtml(err.message)}</div>`;
+      }
     }
 
-    function editChallenge(c) {
-      document.getElementById('ch-modal-title').textContent = 'Edit Challenge';
-      document.getElementById('ch-id').value = c.id;
-      document.getElementById('ch-name').value = c.name;
-      document.getElementById('ch-category').value = c.category;
-      document.getElementById('ch-description').value = c.description;
-      document.getElementById('ch-points').value = c.points;
-      document.getElementById('ch-flag').value = c.flag;
-      // map legacy 'static' to 'exact'
-      document.getElementById('ch-flag-type').value = (c.flag_type === 'static') ? 'exact' : (c.flag_type || 'exact');
-      document.getElementById('ch-deploy-type').value = c.deploy_type;
-      document.getElementById('ch-deploy-backend').value = c.deploy_backend;
-      document.getElementById('ch-image').value = c.image;
-      document.getElementById('ch-deploy-config').value = c.deploy_config;
-      document.getElementById('ch-visible').checked = c.is_visible;
-      document.getElementById('ch-error').classList.add('d-none');
-      if (!chBsModal) chBsModal = new bootstrap.Modal(document.getElementById('ch-modal'));
-      chBsModal.show();
+    async function createNotification() {
+      const title   = document.getElementById('notif-title').value.trim();
+      const content = document.getElementById('notif-content').value.trim();
+      if (!title || !content) { alert('Title and content are required.'); return; }
+      try {
+        await apiFetch('/api/admin/notifications', { method: 'POST', body: JSON.stringify({ title, content }) });
+        document.getElementById('notif-title').value   = '';
+        document.getElementById('notif-content').value = '';
+        loadAdminNotifications();
+      } catch (err) { alert(err.message); }
     }
 
-    async function saveChallengeForm(e) {
-      e.preventDefault();
-      const id = document.getElementById('ch-id').value;
+    async function deleteNotification(id) {
+      if (!confirm('Delete this notification?')) return;
+      await apiFetch('/api/admin/notifications/' + id, { method: 'DELETE' });
+      loadAdminNotifications();
+    }
+
+    // ══════════════════════════════════════
+    // PAGES
+    // ══════════════════════════════════════
+    async function loadAdminPages() {
+      const container = document.getElementById('pages-list-container');
+      try {
+        const pages = await apiFetch('/api/admin/pages');
+        if (!pages || !pages.length) {
+          container.innerHTML = '<p class="text-muted text-center py-4">No pages yet.</p>';
+          return;
+        }
+        container.innerHTML = pages.map(p => `
+          <div class="card p-3 mb-2 d-flex flex-row justify-content-between align-items-center">
+            <div>
+              <strong>${escHtml(p.title)}</strong>
+              <span class="text-muted ms-2 small">/${escHtml(p.slug)}</span>
+              ${p.draft ? '<span class="badge bg-warning text-dark ms-2">Draft</span>' : ''}
+            </div>
+            <div class="d-flex gap-1">
+              <button class="btn btn-sm btn-secondary" onclick='editPage(${JSON.stringify(p)})'>${t('pages.edit')}</button>
+              <button class="btn btn-sm btn-danger" onclick="deletePage(${p.id})">${t('pages.delete')}</button>
+            </div>
+          </div>`).join('');
+      } catch (err) {
+        container.innerHTML = `<div class="alert alert-danger">${escHtml(err.message)}</div>`;
+      }
+    }
+
+    function editPage(p) {
+      document.getElementById('page-form-title').textContent = t('pages.edit');
+      document.getElementById('page-id').value      = p.id;
+      document.getElementById('page-title').value   = p.title;
+      document.getElementById('page-slug').value    = p.slug;
+      document.getElementById('page-content').value = p.content;
+      document.getElementById('page-draft').checked = p.draft || false;
+    }
+
+    function resetPageForm() {
+      document.getElementById('page-form-title').textContent = t('pages.new');
+      document.getElementById('page-id').value      = '';
+      document.getElementById('page-title').value   = '';
+      document.getElementById('page-slug').value    = '';
+      document.getElementById('page-content').value = '';
+      document.getElementById('page-draft').checked = false;
+    }
+
+    async function savePage() {
+      const id      = document.getElementById('page-id').value;
       const body = {
-        name: document.getElementById('ch-name').value,
-        category: document.getElementById('ch-category').value,
-        description: document.getElementById('ch-description').value,
-        points: parseInt(document.getElementById('ch-points').value),
-        flag: document.getElementById('ch-flag').value,
-        flag_type: document.getElementById('ch-flag-type').value,
-        deploy_type: document.getElementById('ch-deploy-type').value,
-        deploy_backend: document.getElementById('ch-deploy-backend').value,
-        image: document.getElementById('ch-image').value,
-        deploy_config: document.getElementById('ch-deploy-config').value,
-        is_visible: document.getElementById('ch-visible').checked,
+        title:   document.getElementById('page-title').value,
+        slug:    document.getElementById('page-slug').value,
+        content: document.getElementById('page-content').value,
+        draft:   document.getElementById('page-draft').checked,
       };
-      const errEl = document.getElementById('ch-error');
-      errEl.classList.add('d-none');
       try {
         if (id) {
-          await apiFetch('/api/admin/challenges/' + id, { method: 'PUT', body: JSON.stringify(body) });
+          await apiFetch('/api/admin/pages/' + id, { method: 'PUT', body: JSON.stringify(body) });
         } else {
-          await apiFetch('/api/admin/challenges', { method: 'POST', body: JSON.stringify(body) });
+          await apiFetch('/api/admin/pages', { method: 'POST', body: JSON.stringify(body) });
         }
-        chBsModal.hide();
-        loadAdminChallenges();
+        resetPageForm();
+        loadAdminPages();
+      } catch (err) { alert(err.message); }
+    }
+
+    async function deletePage(id) {
+      if (!confirm('Delete this page?')) return;
+      await apiFetch('/api/admin/pages/' + id, { method: 'DELETE' });
+      loadAdminPages();
+    }
+
+    // ══════════════════════════════════════
+    // CONFIG
+    // ══════════════════════════════════════
+    async function loadAdminConfig() {
+      try {
+        const [cfg, theme] = await Promise.all([
+          apiFetch('/api/admin/config').catch(() => ({})),
+          apiFetch('/api/theme').catch(() => ({})),
+        ]);
+        document.getElementById('cfg-name').value        = cfg.ctf_name       || '';
+        document.getElementById('cfg-description').value = cfg.description    || '';
+        document.getElementById('cfg-reg-open').checked  = !!cfg.registration_open;
+        document.getElementById('cfg-team-mode').checked = !!cfg.team_mode;
+        document.getElementById('theme-vars').value      = JSON.stringify(theme, null, 2);
+      } catch (err) {
+        console.error('Config load error:', err);
+      }
+    }
+
+    async function saveConfig() {
+      const errEl = document.getElementById('cfg-error');
+      const okEl  = document.getElementById('cfg-success');
+      errEl.classList.add('d-none');
+      okEl.classList.add('d-none');
+      const body = {
+        ctf_name:          document.getElementById('cfg-name').value,
+        description:       document.getElementById('cfg-description').value,
+        registration_open: document.getElementById('cfg-reg-open').checked,
+        team_mode:         document.getElementById('cfg-team-mode').checked,
+      };
+      try {
+        await apiFetch('/api/admin/config', { method: 'PUT', body: JSON.stringify(body) });
+        okEl.textContent = 'Config saved!';
+        okEl.classList.remove('d-none');
       } catch (err) {
         errEl.textContent = err.message;
         errEl.classList.remove('d-none');
       }
     }
 
-    async function deleteChallenge(id) {
-      if (!confirm('Delete challenge ' + id + '?')) return;
-      await apiFetch('/api/admin/challenges/' + id, { method: 'DELETE' });
-      loadAdminChallenges();
+    async function saveTheme() {
+      const errEl = document.getElementById('theme-error');
+      const okEl  = document.getElementById('theme-success');
+      errEl.classList.add('d-none');
+      okEl.classList.add('d-none');
+      let vars;
+      try {
+        vars = JSON.parse(document.getElementById('theme-vars').value);
+      } catch (_) {
+        errEl.textContent = 'Invalid JSON';
+        errEl.classList.remove('d-none');
+        return;
+      }
+      try {
+        await apiFetch('/api/admin/theme', { method: 'PUT', body: JSON.stringify(vars) });
+        okEl.textContent = 'Theme saved!';
+        okEl.classList.remove('d-none');
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.classList.remove('d-none');
+      }
     }
 
-    function escHtml(s) {
-      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    }
-
+    // ══════════════════════════════════════
+    // INIT
+    // ══════════════════════════════════════
     (async () => {
       await initI18n();
       const user = await getMe();
@@ -340,3 +862,11 @@
   </script>
 </body>
 </html>
+<!--
+  NOTE: The following routes need to be registered in the Go router:
+    GET  /notifications       → frontend/notifications.html
+    GET  /statistics          → frontend/statistics.html
+    GET  /page                → frontend/page.html  (with ?slug=xxx)
+    GET  /admin/users/:id     → frontend/admin-user.html
+-->
+
