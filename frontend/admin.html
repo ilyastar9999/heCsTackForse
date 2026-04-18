@@ -510,7 +510,7 @@
         container.innerHTML = flags.map(f => `
           <div class="hint-item d-flex justify-content-between align-items-center">
             <div><code style="color:var(--ctf-text)">${escHtml(f.content)}</code> <span class="tag ms-2">${escHtml(f.type)}</span></div>
-            <button type="button" class="btn btn-sm btn-danger" onclick="deleteFlag(${challengeId},${f.id})">✕</button>
+            <button type="button" class="btn btn-sm btn-danger" onclick="deleteFlag(${parseInt(challengeId)},${parseInt(f.id)})">✕</button>
           </div>`).join('');
       } catch (err) {
         container.innerHTML = `<div class="text-danger small">${escHtml(err.message)}</div>`;
@@ -549,10 +549,10 @@
         container.innerHTML = hints.map(h => `
           <div class="hint-item d-flex justify-content-between align-items-center">
             <div>
-              <span class="hint-cost">${h.cost > 0 ? h.cost + ' pts' : 'Free'}</span>
+              <span class="hint-cost">${parseInt(h.cost) > 0 ? parseInt(h.cost) + ' pts' : 'Free'}</span>
               <span class="ms-2">${escHtml(h.content)}</span>
             </div>
-            <button type="button" class="btn btn-sm btn-danger" onclick="deleteHint(${challengeId},${h.id})">✕</button>
+            <button type="button" class="btn btn-sm btn-danger" onclick="deleteHint(${parseInt(challengeId)},${parseInt(h.id)})">✕</button>
           </div>`).join('');
       } catch (err) {
         container.innerHTML = `<div class="text-danger small">${escHtml(err.message)}</div>`;
@@ -593,7 +593,7 @@
           <div class="file-item">
             <span class="file-icon">📄</span>
             <a href="${escHtml(f.url || f.path || '')}" target="_blank">${escHtml(f.name || f.filename || f.url || '')}</a>
-            <button type="button" class="btn btn-sm btn-danger ms-auto" onclick="deleteFile(${challengeId},${f.id})">✕</button>
+            <button type="button" class="btn btn-sm btn-danger ms-auto" onclick="deleteFile(${parseInt(challengeId)},${parseInt(f.id)})">✕</button>
           </div>`).join('');
       } catch (err) {
         container.innerHTML = `<div class="text-danger small">${escHtml(err.message)}</div>`;

@@ -8,10 +8,11 @@ async function loadStatistics() {
   try {
     const stats = await apiFetch('/api/statistics');
 
-    document.getElementById('stat-users').textContent      = stats.total_users      ?? stats.users      ?? '–';
-    document.getElementById('stat-challenges').textContent = stats.total_challenges ?? stats.challenges ?? '–';
-    document.getElementById('stat-correct').textContent    = stats.correct_submissions ?? stats.correct ?? '–';
-    document.getElementById('stat-total').textContent      = stats.total_submissions   ?? stats.total   ?? '–';
+    // API returns: users_count, teams_count, challenges_count, submissions_count, correct_submissions, categories[{name,count,solved}]
+    document.getElementById('stat-users').textContent      = stats.users_count         ?? '–';
+    document.getElementById('stat-challenges').textContent = stats.challenges_count    ?? '–';
+    document.getElementById('stat-correct').textContent    = stats.correct_submissions ?? '–';
+    document.getElementById('stat-total').textContent      = stats.submissions_count   ?? '–';
 
     const categories = stats.categories || [];
     const tbody = document.getElementById('category-body');
@@ -21,9 +22,9 @@ async function loadStatistics() {
     }
     tbody.innerHTML = categories.map(cat => `
       <tr>
-        <td><span class="tag-badge">${escHtml(cat.name || cat.category || '')}</span></td>
-        <td>${cat.challenge_count ?? cat.challenges ?? 0}</td>
-        <td>${cat.solve_count ?? cat.solves ?? 0}</td>
+        <td><span class="tag-badge">${escHtml(cat.name || '')}</span></td>
+        <td>${cat.count ?? 0}</td>
+        <td>${cat.solved ?? 0}</td>
       </tr>
     `).join('');
   } catch (err) {
