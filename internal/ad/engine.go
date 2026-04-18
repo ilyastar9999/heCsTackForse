@@ -336,8 +336,8 @@ func (e *Engine) runSploits(round int64) {
 			continue
 		}
 		type target struct {
-			teamID     int64
-			connInfo   map[string]any
+			teamID   int64
+			connInfo map[string]any
 		}
 		var targets []target
 		for instRows.Next() {

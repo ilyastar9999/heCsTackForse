@@ -47,21 +47,71 @@ async function initI18n() {
 }
 
 /**
- * Load and apply a custom CSS theme from the server.
- * Injects a <style> element with CSS variable overrides into <head>.
+ * Load and apply a custom theme from the server.
+ * Supports theme name, CSS variables, custom CSS, theme CSS bundle and custom JS.
  */
 async function loadTheme() {
   try {
-    const vars = await fetch('/api/theme').then(r => r.ok ? r.json() : null).catch(() => null);
-    if (vars && typeof vars === 'object' && Object.keys(vars).length > 0) {
+    const raw = await fetch('/api/theme').then(r => r.ok ? r.json() : null).catch(() => null);
+    const theme = normalizeThemeConfig(raw);
+
+    const oldVars = document.getElementById('ctf-theme-override');
+    if (oldVars) oldVars.remove();
+    const oldCss = document.getElementById('ctf-theme-custom-css');
+    if (oldCss) oldCss.remove();
+    const oldLink = document.getElementById('ctf-theme-bundle-css');
+    if (oldLink) oldLink.remove();
+    const oldJs = document.getElementById('ctf-theme-custom-js');
+    if (oldJs) oldJs.remove();
+
+    document.documentElement.setAttribute('data-theme', theme.name || 'default');
+
+    if (theme.name && theme.name !== 'default') {
+      const link = document.createElement('link');
+      link.id = 'ctf-theme-bundle-css';
+      link.rel = 'stylesheet';
+      link.href = `/static/themes/${encodeURIComponent(theme.name)}/theme.css`;
+      document.head.appendChild(link);
+    }
+
+    const vars = theme.vars || {};
+    if (Object.keys(vars).length > 0) {
       const style = document.createElement('style');
       style.id = 'ctf-theme-override';
       style.textContent = ':root {' + Object.entries(vars).map(([k, v]) => `${k}:${v}`).join(';') + '}';
-      const existing = document.getElementById('ctf-theme-override');
-      if (existing) existing.remove();
       document.head.appendChild(style);
     }
+
+    if (theme.custom_css) {
+      const customCss = document.createElement('style');
+      customCss.id = 'ctf-theme-custom-css';
+      customCss.textContent = theme.custom_css;
+      document.head.appendChild(customCss);
+    }
+
+    if (theme.custom_js) {
+      const script = document.createElement('script');
+      script.id = 'ctf-theme-custom-js';
+      script.text = theme.custom_js;
+      document.head.appendChild(script);
+    }
   } catch (_) { /* ignore */ }
+}
+
+function normalizeThemeConfig(raw) {
+  if (!raw || typeof raw !== 'object') {
+    return { name: 'default', vars: {}, custom_css: '', custom_js: '' };
+  }
+  const hasExtendedKeys = ('vars' in raw) || ('name' in raw) || ('custom_css' in raw) || ('custom_js' in raw);
+  if (!hasExtendedKeys) {
+    return { name: 'default', vars: raw, custom_css: '', custom_js: '' };
+  }
+  return {
+    name: typeof raw.name === 'string' && raw.name ? raw.name : 'default',
+    vars: raw.vars && typeof raw.vars === 'object' ? raw.vars : {},
+    custom_css: typeof raw.custom_css === 'string' ? raw.custom_css : '',
+    custom_js: typeof raw.custom_js === 'string' ? raw.custom_js : '',
+  };
 }
 
 /**
@@ -106,4 +156,8 @@ async function setLang(lang) {
 function updateLangToggle() {
   const el = document.getElementById('lang-toggle-label');
   if (el) el.textContent = _lang.toUpperCase();
+}
+
+function formatProfileLabel(username) {
+  return `${t('nav.profile')} (${username})`;
 }

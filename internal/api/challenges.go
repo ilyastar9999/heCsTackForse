@@ -38,7 +38,7 @@ func (s *Server) handleListChallenges(c echo.Context) error {
 			&ch.FlagType, &ch.DeployType, &ch.DeployBackend, &ch.IsVisible, &ch.ConnectionInfo, &ch.CreatedAt, &ch.SolveCount); err != nil {
 			continue
 		}
-		// Apply dynamic scoring if configured
+		// Apply the configured scoring plugin to the listed challenge.
 		ch.Points = s.scoreChallenge(&ch, ch.SolveCount)
 		var cnt int
 		_ = s.db.QueryRow("SELECT COUNT(*) FROM submissions WHERE user_id=? AND challenge_id=? AND is_correct", userID, ch.ID).Scan(&cnt)
@@ -98,11 +98,12 @@ func (s *Server) handleSubmitFlag(c echo.Context) error {
 	}
 
 	var correctFlag string
+	var challengeName string
 	var points int
 	var flagType string
 	var solveCount int
-	err = s.db.QueryRow("SELECT flag, points, flag_type, (SELECT COUNT(*) FROM submissions WHERE challenge_id=challenges.id AND is_correct) FROM challenges WHERE id=? AND is_visible", id).
-		Scan(&correctFlag, &points, &flagType, &solveCount)
+	err = s.db.QueryRow("SELECT flag, name, points, flag_type, (SELECT COUNT(*) FROM submissions WHERE challenge_id=challenges.id AND is_correct) FROM challenges WHERE id=? AND is_visible", id).
+		Scan(&correctFlag, &challengeName, &points, &flagType, &solveCount)
 	if err == sql.ErrNoRows {
 		return c.JSON(http.StatusNotFound, map[string]string{"error": "challenge not found"})
 	}
@@ -153,19 +154,138 @@ func (s *Server) handleSubmitFlag(c echo.Context) error {
 
 	if isCorrect {
 		_, _ = s.db.Exec("UPDATE users SET score = score + ? WHERE id = ?", awardedPoints, userID)
+		go s.notifySolve(userID, challengeName, awardedPoints, solveCount+1)
 		return c.JSON(http.StatusOK, map[string]any{"correct": true, "points": awardedPoints})
 	}
 	return c.JSON(http.StatusOK, map[string]any{"correct": false})
 }
 
+func (s *Server) notifySolve(userID int64, challengeName string, points, solveNum int) {
+	settings := s.loadNotifierSettings()
+	if !settings.bool("notifier_send_notifications") || !settings.bool("notifier_send_solves") {
+		return
+	}
+
+	maxSolveCount := settings.int("notifier_solve_count")
+	if maxSolveCount > 0 && solveNum > maxSolveCount {
+		return
+	}
+
+	solverName := "unknown"
+	_ = s.db.QueryRow("SELECT username FROM users WHERE id=?", userID).Scan(&solverName)
+
+	msgTemplate := settings.str("notifier_solve_msg")
+	if strings.TrimSpace(msgTemplate) == "" {
+		msgTemplate = "{solver} solved {challenge} ({solve_num} solve)"
+	}
+	msg := strings.NewReplacer(
+		"{solver}", solverName,
+		"{challenge}", challengeName,
+		"{solve_num}", strconv.Itoa(solveNum),
+		"{points}", strconv.Itoa(points),
+	).Replace(msgTemplate)
+
+	notifierName := strings.TrimSpace(settings.str("notifier_type"))
+	n, err := plugin.Default.GetNotifier(notifierName)
+	if err != nil || n == nil {
+		notifiers := plugin.Default.NotifierNames()
+		if len(notifiers) == 0 {
+			return
+		}
+		n, err = plugin.Default.GetNotifier(notifiers[0])
+		if err != nil || n == nil {
+			return
+		}
+		notifierName = notifiers[0]
+	}
+
+	_ = n.Notify(plugin.Event{
+		Type: "solve",
+		Data: map[string]any{
+			"solver":                       solverName,
+			"challenge":                    challengeName,
+			"points":                       points,
+			"solve_num":                    solveNum,
+			"message":                      msg,
+			"notifier_plugin":              notifierName,
+			"notifier_type":                settings.str("notifier_type"),
+			"notifier_send_notifications":  settings.bool("notifier_send_notifications"),
+			"notifier_send_solves":         settings.bool("notifier_send_solves"),
+			"notifier_solve_msg":           msgTemplate,
+			"notifier_solve_count":         settings.int("notifier_solve_count"),
+			"notifier_slack_webhook_url":   settings.str("notifier_slack_webhook_url"),
+			"notifier_discord_webhook_url": settings.str("notifier_discord_webhook_url"),
+			"notifier_telegram_bot_token":  settings.str("notifier_telegram_bot_token"),
+			"notifier_telegram_chat_id":    settings.str("notifier_telegram_chat_id"),
+		},
+	})
+}
+
+type notifierSettings map[string]string
+
+func (s notifierSettings) str(key string) string {
+	return strings.TrimSpace(s[key])
+}
+
+func (s notifierSettings) bool(key string) bool {
+	v, err := strconv.ParseBool(strings.TrimSpace(s[key]))
+	if err != nil {
+		return false
+	}
+	return v
+}
+
+func (s notifierSettings) int(key string) int {
+	v, err := strconv.Atoi(strings.TrimSpace(s[key]))
+	if err != nil {
+		return 0
+	}
+	return v
+}
+
+func (s *Server) loadNotifierSettings() notifierSettings {
+	rows, err := s.db.Query(`SELECT key, value FROM ctf_settings WHERE key LIKE 'notifier_%'`)
+	if err != nil {
+		return notifierSettings{}
+	}
+	defer rows.Close()
+
+	settings := notifierSettings{}
+	for rows.Next() {
+		var key, value string
+		if err := rows.Scan(&key, &value); err != nil {
+			continue
+		}
+		settings[key] = value
+	}
+
+	if _, ok := settings["notifier_send_notifications"]; !ok {
+		settings["notifier_send_notifications"] = "false"
+	}
+	if _, ok := settings["notifier_send_solves"]; !ok {
+		settings["notifier_send_solves"] = "false"
+	}
+	if _, ok := settings["notifier_type"]; !ok {
+		settings["notifier_type"] = ""
+	}
+
+	return settings
+}
+
 // scoreChallenge applies the configured scoring plugin to a challenge.
 func (s *Server) scoreChallenge(ch *models.Challenge, solveCount int) int {
-	if s.cfg.CTF.Scoring == "dynamic" {
-		scorer := &plugin.DynamicScorer{}
-		_ = scorer.Init(nil)
-		return scorer.CalculateScore(ch, solveCount)
+	scorerName := strings.TrimSpace(s.cfg.CTF.Scoring)
+	if scorerName == "" {
+		scorerName = "static"
 	}
-	scorer := &plugin.StaticScorer{}
+	scorer, err := plugin.Default.GetScorer(scorerName)
+	if err != nil || scorer == nil {
+		scorer, _ = plugin.Default.GetScorer("static")
+	}
+	if scorer == nil {
+		return ch.Points
+	}
+	_ = scorer.Init(nil)
 	return scorer.CalculateScore(ch, solveCount)
 }
 

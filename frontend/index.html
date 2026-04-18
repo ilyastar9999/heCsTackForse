@@ -19,7 +19,7 @@
           <li class="nav-item"><a class="nav-link" data-i18n="nav.challenges" href="/challenges">Challenges</a></li>
           <li class="nav-item"><a class="nav-link" data-i18n="nav.scoreboard" href="/scoreboard">Scoreboard</a></li>
           <li class="nav-item" id="nav-notifications-li" style="display:none">
-            <a class="nav-link bell-indicator" data-i18n="nav.notifications" href="/notifications">🔔 Notifications</a>
+            <a class="nav-link bell-indicator" href="/notifications"><span aria-hidden="true">🔔</span> <span data-i18n="nav.notifications">Notifications</span></a>
           </li>
         </ul>
         <ul class="navbar-nav ms-auto">
@@ -57,7 +57,7 @@
     (async () => {
       const user = await getMe();
       if (user) {
-        document.getElementById('nav-profile').textContent = user.username;
+        document.getElementById('nav-profile').textContent = formatProfileLabel(user.username);
         document.getElementById('nav-profile-li').style.display = '';
         document.getElementById('nav-login-li').style.display = 'none';
         document.getElementById('nav-register-li').style.display = 'none';

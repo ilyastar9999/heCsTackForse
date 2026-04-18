@@ -60,7 +60,7 @@
       await initI18n();
       const user = await getMe();
       if (user) {
-        document.getElementById('nav-profile').textContent = user.username;
+        document.getElementById('nav-profile').textContent = formatProfileLabel(user.username);
         document.getElementById('nav-profile-li').style.display = '';
         document.getElementById('nav-login-li').style.display = 'none';
         document.getElementById('nav-register-li').style.display = 'none';

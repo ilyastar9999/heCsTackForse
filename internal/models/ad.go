@@ -35,7 +35,7 @@ type SploitResult struct {
 type VPNPeer struct {
 	ID         int64     `json:"id"`
 	TeamID     int64     `json:"team_id"`
-	PrivateKey string    `json:"-"`         // never sent to clients
+	PrivateKey string    `json:"-"` // never sent to clients
 	PublicKey  string    `json:"public_key"`
 	AllowedIP  string    `json:"allowed_ip"` // e.g. 10.8.1.0/24
 	CreatedAt  time.Time `json:"created_at"`

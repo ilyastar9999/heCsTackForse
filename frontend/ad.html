@@ -148,7 +148,7 @@ print(s.recv(1024).decode())  # FLAG{...} extracted automatically"></textarea>
     (async () => {
       const user = await api.me();
       if (!user) { window.location.href = '/login'; return; }
-      document.getElementById('nav-profile').textContent = user.username;
+      document.getElementById('nav-profile').textContent = `Profile (${user.username})`;
       document.getElementById('nav-login-li').style.display = 'none';
     })();
 

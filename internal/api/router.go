@@ -54,6 +54,8 @@ func (s *Server) buildRouter() *echo.Echo {
 	e.GET("/challenges", func(c echo.Context) error { return c.File(sd + "/challenges.html") })
 	e.GET("/profile", func(c echo.Context) error { return c.File(sd + "/profile.html") })
 	e.GET("/admin", func(c echo.Context) error { return c.File(sd + "/admin.html") })
+	e.GET("/admin/plugins", func(c echo.Context) error { return c.File(sd + "/admin-plugins.html") })
+	e.GET("/admin/plugins/:slug", func(c echo.Context) error { return c.File(sd + "/admin-plugin-chat-notifier.html") })
 	e.GET("/admin/users/:id", func(c echo.Context) error { return c.File(sd + "/admin-user.html") })
 	e.GET("/ad", func(c echo.Context) error { return c.File(sd + "/ad.html") })
 	e.GET("/notifications", func(c echo.Context) error { return c.File(sd + "/notifications.html") })

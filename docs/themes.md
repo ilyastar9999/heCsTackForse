@@ -1,24 +1,40 @@
 # Theme System
 
-heCsTackForse uses a **CSS-variable-based theme system** that stores the active
-theme as a JSON object in the `ctf_settings` table (key = `theme`) and delivers
-it to the browser via `GET /api/theme`.
+heCsTackForse now supports a **full theme object** (CTFd-style) with:
+- theme preset/bundle name,
+- CSS variable overrides,
+- custom CSS,
+- custom JS.
+
+Theme settings are stored in `ctf_settings` (`key = theme`) and delivered by
+`GET /api/theme`.
 
 ---
 
 ## How It Works
 
 1. On every page load, the frontend calls `GET /api/theme`.
-2. The response is a flat JSON object mapping CSS variable names → values:
+2. The response is a theme JSON object:
    ```json
    {
-     "--ctf-bg": "#0d0f13",
-     "--ctf-card": "#161b22",
-     "--ctf-accent": "#7e3ff2"
+     "name": "default",
+     "vars": {
+       "--ctf-bg": "#0d0f13",
+       "--ctf-card": "#161b22",
+       "--ctf-accent": "#7e3ff2"
+     },
+     "custom_css": "",
+     "custom_js": ""
    }
    ```
-3. A `<style>:root { … }</style>` block is injected before the first paint,
-   overriding the defaults in `style.css`.
+3. Frontend applies, in order:
+   - theme bundle CSS from `/static/themes/{name}/theme.css` (if `name != default`),
+   - `vars` into `:root`,
+   - `custom_css`,
+   - `custom_js`.
+
+Legacy support: old payloads with only CSS variables are still accepted and
+automatically normalized to `{ "name": "default", "vars": { ... } }`.
 
 ---
 
@@ -49,11 +65,16 @@ it to the browser via `GET /api/theme`.
    to specify all of them — only overrides are needed).
 4. Click **Save Theme**.
 
-Example — orange accent:
+Example — full theme payload:
 ```json
 {
-  "--ctf-accent": "#f97316",
-  "--ctf-accent2": "#fb923c"
+  "name": "default",
+  "vars": {
+    "--ctf-accent": "#f97316",
+    "--ctf-accent2": "#fb923c"
+  },
+  "custom_css": ".navbar { backdrop-filter: blur(8px); }",
+  "custom_js": "console.log('theme loaded')"
 }
 ```
 
@@ -67,10 +88,13 @@ Authorization: Bearer <admin_token>
 Content-Type: application/json
 
 {
+  "name": "default",
   "vars": {
     "--ctf-accent": "#f97316",
     "--ctf-accent2": "#fb923c"
-  }
+  },
+  "custom_css": "",
+  "custom_js": ""
 }
 ```
 
@@ -78,10 +102,10 @@ Content-Type: application/json
 
 ## Resetting to Default
 
-Send an empty object:
+Send an empty theme object:
 ```http
 PUT /api/admin/theme
-{ "vars": {} }
+{ "name": "default", "vars": {} }
 ```
 
 Or delete the `theme` key from `ctf_settings` directly in the database.

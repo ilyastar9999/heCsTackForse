@@ -4,6 +4,11 @@ heCsTackForse ships with an extensible plugin system modelled after CTFd's appro
 Plugins are pure Go packages that implement one of the defined interfaces and
 self-register into the process-wide `plugin.Default` registry during `init()`.
 
+There is also an optional Python bridge for teams that want to reuse Python
+plugin logic without rewriting it in Go. The bridge is not a full CTFd runtime;
+it is a lightweight adapter that loads Python modules and maps them onto the
+same Go plugin interfaces.
+
 ---
 
 ## Plugin Interfaces
@@ -78,6 +83,10 @@ ctf:
   scoring: dynamic   # "static" | "dynamic" | <custom name>
 ```
 
+If `ctf.scoring` is set to any other registered scorer name, the server will
+look it up in the registry and use it directly. That means Python bridge
+scorers can be selected the same way as Go-native ones.
+
 ---
 
 ### `Notifier`
@@ -146,6 +155,50 @@ Admin panel or `PUT /api/admin/challenges/:id`.
 
 ---
 
+## Python Bridge
+
+If you need to reuse Python code, enable the bridge in `config.yaml`:
+
+```yaml
+plugins:
+  enabled: true
+  python: python
+  script: ./python/ctfd_bridge.py
+  plugin_dirs:
+    - ./my-python-plugins
+```
+
+Each plugin module can either expose a `register(registry)` function or use the
+decorators exported by `python/ctfd_bridge.py`:
+
+```python
+from ctfd_bridge import flag_checker, scorer
+
+@flag_checker("my_checker")
+class MyChecker:
+    def name(self):
+        return "my_checker"
+
+    def check(self, correct_flag, submitted):
+        return submitted == correct_flag
+
+
+@scorer("my_score")
+class MyScore:
+    def name(self):
+        return "my_score"
+
+    def calculate_score(self, challenge, solve_count):
+        return challenge.points
+```
+
+The bridge currently supports flag checkers, scorers, notifiers, and challenge
+type extensions. Flag checkers, scorers, and notifiers appear in `GET /api/plugins`.
+Challenge types appear in `GET /api/challenge-types`. Flag checkers show up in
+the challenge editor automatically.
+
+---
+
 ## Registry API
 
 ```go
@@ -181,3 +234,6 @@ All methods are safe for concurrent use.
 ```
 
 No authentication is required for this endpoint.
+
+The challenge editor uses the same registry data to populate the flag checker
+select, so externally loaded plugins are selectable without a code change.

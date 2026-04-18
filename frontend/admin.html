@@ -6,6 +6,7 @@
   <title>Admin – heCsTackForse</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 </head>
 <body>
   <nav class="navbar navbar-expand-lg sticky-top">
@@ -21,6 +22,7 @@
         </ul>
         <ul class="navbar-nav ms-auto">
           <li class="nav-item"><a class="nav-link active" data-i18n="nav.admin" href="/admin">Admin</a></li>
+          <li class="nav-item"><a class="nav-link" href="/admin/plugins">Plugins</a></li>
           <li class="nav-item"><a class="nav-link" data-i18n="nav.profile" href="/profile">Profile</a></li>
           <li class="nav-item"><a class="nav-link" data-i18n="nav.logout" href="#" onclick="logout()">Logout</a></li>
           <li class="nav-item dropdown">
@@ -52,7 +54,10 @@
         <a class="nav-link" href="#" onclick="showTab('pages',this)" data-i18n="admin.pages">Pages</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link" href="#" onclick="showTab('config',this)" data-i18n="admin.config">Config</a>
+        <a class="nav-link" href="#" onclick="showTab('settings',this)">Settings</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="/admin/plugins">Plugins</a>
       </li>
     </ul>
 
@@ -149,42 +154,515 @@
       </div>
     </div>
 
-    <!-- ═══ Config Tab ═══ -->
-    <div id="tab-config" style="display:none">
-      <div class="row g-4">
-        <div class="col-md-6">
-          <div class="card p-4 mb-4">
-            <h5 class="mb-3" data-i18n="admin.config">General Settings</h5>
-            <div class="mb-3">
-              <label class="form-label" data-i18n="admin.ctf_name">CTF Name</label>
-              <input type="text" class="form-control" id="cfg-name">
-            </div>
-            <div class="mb-3">
-              <label class="form-label" data-i18n="admin.ctf_description">CTF Description</label>
-              <textarea class="form-control" id="cfg-description" rows="3"></textarea>
-            </div>
-            <div class="form-check mb-2">
-              <input class="form-check-input" type="checkbox" id="cfg-reg-open">
-              <label class="form-check-label" for="cfg-reg-open" data-i18n="admin.registration_open">Registration Open</label>
-            </div>
-            <div class="form-check mb-3">
-              <input class="form-check-input" type="checkbox" id="cfg-team-mode">
-              <label class="form-check-label" for="cfg-team-mode" data-i18n="admin.team_mode">Team Mode</label>
-            </div>
-            <div id="cfg-error" class="alert alert-danger d-none"></div>
-            <div id="cfg-success" class="alert alert-success d-none"></div>
-            <button class="btn btn-primary" onclick="saveConfig()" data-i18n="admin.config_save">Save Config</button>
+    <!-- ═══ Settings Tab ═══ -->
+    <div id="tab-settings" style="display:none">
+      <ul class="nav nav-pills flex-wrap gap-2 mb-4" id="settings-tabs">
+        <li class="nav-item"><a class="nav-link active" href="#" onclick="showSettingsSubTab('appearance',this)">Appearance</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="showSettingsSubTab('theme',this)">Theme</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="showSettingsSubTab('accounts',this)">Accounts</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="showSettingsSubTab('pages',this)">Pages</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="showSettingsSubTab('brackets',this)">Brackets</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="showSettingsSubTab('customfields',this)">Custom Fields</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="showSettingsSubTab('mlc',this)">MajorLeagueCyber</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="showSettingsSubTab('settings',this)">Settings</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="showSettingsSubTab('security',this)">Security</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="showSettingsSubTab('email',this)">Email</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="showSettingsSubTab('time',this)">Time</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="showSettingsSubTab('social',this)">Social</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="showSettingsSubTab('legal',this)">Legal</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="showSettingsSubTab('backup',this)">Backup</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="showSettingsSubTab('usermode',this)">User Mode</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="showSettingsSubTab('reset',this)">Reset</a></li>
+      </ul>
+
+      <div id="settings-subtab-appearance">
+        <div class="card p-4 mb-4">
+          <h5 class="mb-3" data-i18n="admin.config">General Settings</h5>
+          <div class="mb-3">
+            <label class="form-label" data-i18n="admin.ctf_name">CTF Name</label>
+            <input type="text" class="form-control" id="cfg-name">
           </div>
+          <div class="mb-3">
+            <label class="form-label" data-i18n="admin.ctf_description">CTF Description</label>
+            <textarea class="form-control" id="cfg-description" rows="3"></textarea>
+          </div>
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="cfg-reg-open">
+            <label class="form-check-label" for="cfg-reg-open" data-i18n="admin.registration_open">Registration Open</label>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="cfg-team-mode">
+            <label class="form-check-label" for="cfg-team-mode" data-i18n="admin.team_mode">Team Mode</label>
+          </div>
+          <div id="cfg-error" class="alert alert-danger d-none"></div>
+          <div id="cfg-success" class="alert alert-success d-none"></div>
+          <button class="btn btn-primary" onclick="saveConfig()" data-i18n="admin.config_save">Save Config</button>
         </div>
-        <div class="col-md-6">
-          <div class="card p-4">
-            <h5 class="mb-3">Theme</h5>
-            <label class="form-label" data-i18n="admin.theme_vars">CSS Variables (JSON)</label>
-            <textarea class="form-control font-monospace" id="theme-vars" rows="10" style="font-size:.82rem">{}</textarea>
-            <div id="theme-error" class="alert alert-danger d-none mt-2"></div>
-            <div id="theme-success" class="alert alert-success d-none mt-2"></div>
-            <button class="btn btn-primary mt-3" onclick="saveTheme()" data-i18n="admin.theme_save">Save Theme</button>
+      </div>
+
+      <div id="settings-subtab-theme" style="display:none">
+        <div class="card p-4 mb-4">
+          <h5 class="mb-3">Theme</h5>
+          <div class="mb-3">
+            <label class="form-label">Theme Name</label>
+            <input type="text" class="form-control" id="cfg-theme-name" placeholder="core">
           </div>
+          <div class="mb-3">
+            <label class="form-label">Theme Header</label>
+            <textarea class="form-control font-monospace" id="cfg-theme-header" rows="4" placeholder="Inserted before </head>"></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Theme Footer</label>
+            <textarea class="form-control font-monospace" id="cfg-theme-footer" rows="4" placeholder="Inserted before </body>"></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Theme Settings (JSON)</label>
+            <textarea class="form-control font-monospace" id="cfg-theme-settings" rows="6">{}</textarea>
+          </div>
+          <label class="form-label" data-i18n="admin.theme_vars">CSS Variables (JSON)</label>
+          <textarea class="form-control font-monospace" id="theme-vars" rows="10" style="font-size:.82rem">{}</textarea>
+          <div id="theme-error" class="alert alert-danger d-none mt-2"></div>
+          <div id="theme-success" class="alert alert-success d-none mt-2"></div>
+          <button class="btn btn-primary mt-3" onclick="saveSettingsSection('themeMeta')">Save Theme Meta</button>
+          <button class="btn btn-outline-primary mt-3 ms-2" onclick="saveTheme()" data-i18n="admin.theme_save">Save CSS Theme Vars</button>
+        </div>
+      </div>
+
+      <div id="settings-subtab-accounts" style="display:none">
+        <div class="card p-4 mb-4">
+          <h5 class="mb-3">Accounts</h5>
+          <div class="mb-3">
+            <label class="form-label">Account Email Whitelist</label>
+            <input type="text" class="form-control" id="cfg-accounts-domain-whitelist" placeholder="ctfd.io, example.com, *.example.com">
+          </div>
+          <div class="row g-3 mb-2">
+            <div class="col-md-6">
+              <label class="form-label">Verify Emails</label>
+              <select class="form-select" id="cfg-accounts-verify-emails">
+                <option value="true">Enabled</option>
+                <option value="false">Disabled</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Team Creation</label>
+              <select class="form-select" id="cfg-accounts-team-creation">
+                <option value="true">Enabled</option>
+                <option value="false">Disabled</option>
+              </select>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Team Size</label>
+            <input type="number" min="1" class="form-control" id="cfg-accounts-max-team-size">
+          </div>
+          <div class="row g-3 mb-2">
+            <div class="col-md-6">
+              <label class="form-label">Total Number of Teams</label>
+              <input type="number" min="0" class="form-control" id="cfg-accounts-num-teams">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Total Number of Users</label>
+              <input type="number" min="0" class="form-control" id="cfg-accounts-num-users">
+            </div>
+          </div>
+          <div class="row g-3 mb-2">
+            <div class="col-md-6">
+              <label class="form-label">Team Disbanding</label>
+              <select class="form-select" id="cfg-accounts-team-disbanding">
+                <option value="inactive_only">Enabled for Inactive Teams</option>
+                <option value="disabled">Disabled</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Incorrect Submissions per Minute</label>
+              <input type="number" min="1" class="form-control" id="cfg-accounts-incorrect-submissions-per-min">
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Name Changes</label>
+            <select class="form-select" id="cfg-accounts-name-changes">
+              <option value="true">Enabled</option>
+              <option value="false">Disabled</option>
+            </select>
+          </div>
+          <div id="settings-accounts-error" class="alert alert-danger d-none"></div>
+          <div id="settings-accounts-success" class="alert alert-success d-none"></div>
+          <button class="btn btn-primary" onclick="saveSettingsSection('accounts')">Save Accounts</button>
+        </div>
+      </div>
+
+      <div id="settings-subtab-pages" style="display:none">
+        <div class="card p-4 mb-4">
+          <h5 class="mb-3">Pages</h5>
+          <div class="mb-3">
+            <label class="form-label">Robots.txt</label>
+            <textarea class="form-control font-monospace" id="cfg-pages-robots-txt" rows="8" placeholder="User-agent: *\nDisallow: /admin"></textarea>
+          </div>
+          <div id="settings-pages-error" class="alert alert-danger d-none"></div>
+          <div id="settings-pages-success" class="alert alert-success d-none"></div>
+          <button class="btn btn-primary" onclick="saveSettingsSection('pages')">Save Pages</button>
+        </div>
+      </div>
+
+      <div id="settings-subtab-brackets" style="display:none">
+        <div class="card p-4 mb-4">
+          <h5 class="mb-3">Brackets</h5>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="cfg-brackets-enabled">
+            <label class="form-check-label" for="cfg-brackets-enabled">Enable Brackets</label>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Bracket Type</label>
+            <select class="form-select" id="cfg-brackets-type">
+              <option value="single_elimination">Single Elimination</option>
+              <option value="double_elimination">Double Elimination</option>
+              <option value="round_robin">Round Robin</option>
+            </select>
+          </div>
+          <div id="settings-brackets-error" class="alert alert-danger d-none"></div>
+          <div id="settings-brackets-success" class="alert alert-success d-none"></div>
+          <button class="btn btn-primary" onclick="saveSettingsSection('brackets')">Save Brackets</button>
+        </div>
+      </div>
+
+      <div id="settings-subtab-customfields" style="display:none">
+        <div class="card p-4 mb-4">
+          <h5 class="mb-3">Custom Fields</h5>
+          <div class="text-muted mb-3">Manage real custom fields in the dedicated user fields admin endpoints.</div>
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="cfg-customfields-enabled">
+            <label class="form-check-label" for="cfg-customfields-enabled">Enable Custom Fields</label>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="cfg-customfields-required">
+            <label class="form-check-label" for="cfg-customfields-required">Require Custom Fields on Registration</label>
+          </div>
+          <div id="settings-customfields-error" class="alert alert-danger d-none"></div>
+          <div id="settings-customfields-success" class="alert alert-success d-none"></div>
+          <button class="btn btn-primary" onclick="saveSettingsSection('customfields')">Save Custom Fields</button>
+        </div>
+      </div>
+
+      <div id="settings-subtab-mlc" style="display:none">
+        <div class="card p-4 mb-4">
+          <h5 class="mb-3">MajorLeagueCyber</h5>
+          <div class="mb-3">
+            <label class="form-label">OAuth Client ID</label>
+            <input type="text" class="form-control" id="cfg-mlc-client-id">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">OAuth Client Secret</label>
+            <input type="text" class="form-control" id="cfg-mlc-client-secret">
+          </div>
+          <div id="settings-mlc-error" class="alert alert-danger d-none"></div>
+          <div id="settings-mlc-success" class="alert alert-success d-none"></div>
+          <button class="btn btn-primary" onclick="saveSettingsSection('mlc')">Save MajorLeagueCyber</button>
+        </div>
+      </div>
+
+      <div id="settings-subtab-settings" style="display:none">
+        <div class="card p-4 mb-4">
+          <h5 class="mb-3">Settings</h5>
+          <div class="row g-3 mb-2">
+            <div class="col-md-6">
+              <label class="form-label">Challenge Visibility</label>
+              <select class="form-select" id="cfg-settings-challenge-visibility">
+                <option value="public">Public</option>
+                <option value="private">Private</option>
+                <option value="admins">Admins Only</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Account Visibility</label>
+              <select class="form-select" id="cfg-settings-account-visibility">
+                <option value="public">Public</option>
+                <option value="private">Private</option>
+                <option value="admins">Admins Only</option>
+              </select>
+            </div>
+          </div>
+          <div class="row g-3 mb-2">
+            <div class="col-md-6">
+              <label class="form-label">Score Visibility</label>
+              <select class="form-select" id="cfg-settings-score-visibility">
+                <option value="public">Public</option>
+                <option value="private">Private</option>
+                <option value="hidden">Hidden</option>
+                <option value="admins">Admins Only</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Registration Visibility</label>
+              <select class="form-select" id="cfg-settings-registration-visibility">
+                <option value="public">Public</option>
+                <option value="private">Private</option>
+                <option value="mlc">MajorLeagueCyber Only</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="cfg-settings-paused">
+            <label class="form-check-label" for="cfg-settings-paused">Pause CTF</label>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Legacy CTF Start (ISO datetime)</label>
+            <input type="text" class="form-control" id="cfg-settings-ctf-start" placeholder="2026-04-20T10:00:00Z">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Legacy CTF End (ISO datetime)</label>
+            <input type="text" class="form-control" id="cfg-settings-ctf-end" placeholder="2026-04-21T10:00:00Z">
+          </div>
+          <div class="mb-3 d-none">
+            <select class="form-select" id="cfg-settings-challenge-visibility-hidden">
+              <option value="public">Public</option>
+              <option value="private">Private</option>
+              <option value="admins_only">Admins Only</option>
+            </select>
+          </div>
+          <div id="settings-settings-error" class="alert alert-danger d-none"></div>
+          <div id="settings-settings-success" class="alert alert-success d-none"></div>
+          <button class="btn btn-primary" onclick="saveSettingsSection('settings')">Save Settings</button>
+        </div>
+      </div>
+
+      <div id="settings-subtab-security" style="display:none">
+        <div class="card p-4 mb-4">
+          <h5 class="mb-3">Security</h5>
+          <div class="mb-3">
+            <label class="form-label">HTML Sanitization</label>
+            <select class="form-select" id="cfg-security-html-sanitization">
+              <option value="true">Enabled</option>
+              <option value="false">Disabled</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Registration Code</label>
+            <input type="text" class="form-control" id="cfg-security-registration-code">
+          </div>
+          <div id="settings-security-error" class="alert alert-danger d-none"></div>
+          <div id="settings-security-success" class="alert alert-success d-none"></div>
+          <button class="btn btn-primary" onclick="saveSettingsSection('security')">Save Security</button>
+        </div>
+      </div>
+
+      <div id="settings-subtab-email" style="display:none">
+        <div class="card p-4 mb-4">
+          <h5 class="mb-3">Email</h5>
+          <div class="mb-3">
+            <label class="form-label">Successful Registration Subject</label>
+            <input type="text" class="form-control" id="cfg-email-successful-registration-subject">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Successful Registration Body</label>
+            <textarea class="form-control" id="cfg-email-successful-registration-body" rows="4"></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Verification Subject</label>
+            <input type="text" class="form-control" id="cfg-email-verification-subject">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Verification Body</label>
+            <textarea class="form-control" id="cfg-email-verification-body" rows="4"></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Mail From Address</label>
+            <input type="email" class="form-control" id="cfg-email-from-address">
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Mail Server Address</label>
+              <input type="text" class="form-control" id="cfg-email-smtp-host">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Mail Server Port</label>
+              <input type="number" min="1" class="form-control" id="cfg-email-smtp-port">
+            </div>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Mail Server Username</label>
+              <input type="text" class="form-control" id="cfg-email-smtp-user">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Mail Server Password</label>
+              <input type="password" class="form-control" id="cfg-email-smtp-pass">
+            </div>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-md-4">
+              <div class="form-check mt-2">
+                <input class="form-check-input" type="checkbox" id="cfg-email-mail-useauth">
+                <label class="form-check-label" for="cfg-email-mail-useauth">Use Auth</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-check mt-2">
+                <input class="form-check-input" type="checkbox" id="cfg-email-mail-ssl">
+                <label class="form-check-label" for="cfg-email-mail-ssl">TLS/SSL</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-check mt-2">
+                <input class="form-check-input" type="checkbox" id="cfg-email-mail-tls">
+                <label class="form-check-label" for="cfg-email-mail-tls">STARTTLS</label>
+              </div>
+            </div>
+          </div>
+          <div id="settings-email-error" class="alert alert-danger d-none"></div>
+          <div id="settings-email-success" class="alert alert-success d-none"></div>
+          <button class="btn btn-primary" onclick="saveSettingsSection('email')">Save Email</button>
+        </div>
+      </div>
+
+      <div id="settings-subtab-time" style="display:none">
+        <div class="card p-4 mb-4">
+          <h5 class="mb-3">Time</h5>
+          <div class="mb-3">
+            <label class="form-label">Start Timestamp (UTC)</label>
+            <input type="number" class="form-control" id="cfg-time-start-ts">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">End Timestamp (UTC)</label>
+            <input type="number" class="form-control" id="cfg-time-end-ts">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Timezone</label>
+            <input type="text" class="form-control" id="cfg-time-timezone" placeholder="UTC">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Freeze Timestamp (UTC)</label>
+            <input type="number" class="form-control" id="cfg-time-freeze-ts">
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="cfg-time-view-after-ctf">
+            <label class="form-check-label" for="cfg-time-view-after-ctf">View After CTF</label>
+          </div>
+          <div id="settings-time-error" class="alert alert-danger d-none"></div>
+          <div id="settings-time-success" class="alert alert-success d-none"></div>
+          <button class="btn btn-primary" onclick="saveSettingsSection('time')">Save Time</button>
+        </div>
+      </div>
+
+      <div id="settings-subtab-social" style="display:none">
+        <div class="card p-4 mb-4">
+          <h5 class="mb-3">Social</h5>
+          <div class="mb-3">
+            <label class="form-label">Social Shares</label>
+            <select class="form-select" id="cfg-social-shares">
+              <option value="true">Enabled</option>
+              <option value="false">Disabled</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Discord URL</label>
+            <input type="url" class="form-control" id="cfg-social-discord">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Twitter/X URL</label>
+            <input type="url" class="form-control" id="cfg-social-twitter">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Website URL</label>
+            <input type="url" class="form-control" id="cfg-social-website">
+          </div>
+          <div id="settings-social-error" class="alert alert-danger d-none"></div>
+          <div id="settings-social-success" class="alert alert-success d-none"></div>
+          <button class="btn btn-primary" onclick="saveSettingsSection('social')">Save Social</button>
+        </div>
+      </div>
+
+      <div id="settings-subtab-legal" style="display:none">
+        <div class="card p-4 mb-4">
+          <h5 class="mb-3">Legal</h5>
+          <div class="mb-3">
+            <label class="form-label">Terms URL</label>
+            <input type="url" class="form-control" id="cfg-legal-terms-url">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Terms Text</label>
+            <textarea class="form-control" id="cfg-legal-terms-text" rows="6"></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Privacy URL</label>
+            <input type="url" class="form-control" id="cfg-legal-privacy-url">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Privacy Text</label>
+            <textarea class="form-control" id="cfg-legal-privacy-text" rows="6"></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Rules URL</label>
+            <input type="url" class="form-control" id="cfg-legal-rules-url">
+          </div>
+          <div id="settings-legal-error" class="alert alert-danger d-none"></div>
+          <div id="settings-legal-success" class="alert alert-success d-none"></div>
+          <button class="btn btn-primary" onclick="saveSettingsSection('legal')">Save Legal</button>
+        </div>
+      </div>
+
+      <div id="settings-subtab-backup" style="display:none">
+        <div class="card p-4 mb-4">
+          <h5 class="mb-3">Backup</h5>
+          <div class="d-flex gap-2 mb-3 flex-wrap">
+            <a class="btn btn-warning" href="/admin/export">Export</a>
+            <a class="btn btn-outline-warning" href="/admin/export/csv?table=scoreboard">Download CSV</a>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="cfg-backup-enabled">
+            <label class="form-check-label" for="cfg-backup-enabled">Enable Backups</label>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Backup Schedule (cron)</label>
+            <input type="text" class="form-control" id="cfg-backup-schedule" placeholder="0 3 * * *">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Retention (days)</label>
+            <input type="number" min="1" class="form-control" id="cfg-backup-retention-days">
+          </div>
+          <div id="settings-backup-error" class="alert alert-danger d-none"></div>
+          <div id="settings-backup-success" class="alert alert-success d-none"></div>
+          <button class="btn btn-primary" onclick="saveSettingsSection('backup')">Save Backup</button>
+        </div>
+      </div>
+
+      <div id="settings-subtab-usermode" style="display:none">
+        <div class="card p-4 mb-4">
+          <h5 class="mb-3">User Mode</h5>
+          <div class="mb-3">
+            <label class="form-label d-block">Mode</label>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="cfg-usermode-mode" id="cfg-usermode-teams" value="teams">
+              <label class="form-check-label" for="cfg-usermode-teams">Team Mode</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="cfg-usermode-mode" id="cfg-usermode-users" value="users">
+              <label class="form-check-label" for="cfg-usermode-users">User Mode</label>
+            </div>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="cfg-usermode-allow-switch">
+            <label class="form-check-label" for="cfg-usermode-allow-switch">Allow Users To Switch Mode</label>
+          </div>
+          <div id="settings-usermode-error" class="alert alert-danger d-none"></div>
+          <div id="settings-usermode-success" class="alert alert-success d-none"></div>
+          <button class="btn btn-primary" onclick="saveSettingsSection('usermode')">Save User Mode</button>
+        </div>
+      </div>
+
+      <div id="settings-subtab-reset" style="display:none">
+        <div class="card p-4 mb-4">
+          <h5 class="mb-3">Reset Parameters</h5>
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="cfg-reset-preserve-users">
+            <label class="form-check-label" for="cfg-reset-preserve-users">Preserve Users</label>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="cfg-reset-preserve-teams">
+            <label class="form-check-label" for="cfg-reset-preserve-teams">Preserve Teams</label>
+          </div>
+          <div id="settings-reset-error" class="alert alert-danger d-none"></div>
+          <div id="settings-reset-success" class="alert alert-success d-none"></div>
+          <button class="btn btn-primary" onclick="saveSettingsSection('reset')">Save Reset Params</button>
         </div>
       </div>
     </div>
@@ -244,10 +722,7 @@
                   </select>
                 </div>
               </div>
-              <div class="mb-3">
-                <label class="form-label">Flag (primary)</label>
-                <input type="text" class="form-control" id="ch-flag">
-              </div>
+              <!-- Flag (primary) field removed -->
               <div class="mb-3">
                 <label class="form-label" data-i18n="admin.connection_info">Connection Info</label>
                 <textarea class="form-control font-monospace" id="ch-connection-info" rows="2" placeholder="nc host 1234"></textarea>
@@ -356,6 +831,31 @@
       return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
+    function pluginLabel(name) {
+      const labels = {
+        exact: 'Exact (static)',
+        regex: 'Regex',
+        case_insensitive: 'Case-Insensitive',
+        prefix: 'Prefix',
+      };
+      if (labels[name]) return labels[name];
+      return name.replace(/[_-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    }
+
+    async function loadPluginOptions() {
+      try {
+        const plugins = await apiFetch('/api/plugins');
+        const flagCheckers = Array.isArray(plugins.flag_checkers) ? plugins.flag_checkers : [];
+        const flagSelect = document.getElementById('ch-flag-type');
+        const newFlagSelect = document.getElementById('new-flag-type');
+        const options = flagCheckers.map(name => `<option value="${escHtml(name)}">${escHtml(pluginLabel(name))}</option>`).join('');
+        if (flagSelect) flagSelect.innerHTML = options || flagSelect.innerHTML;
+        if (newFlagSelect) newFlagSelect.innerHTML = options || newFlagSelect.innerHTML;
+      } catch (_) {
+        // Keep the built-in fallback options when the registry endpoint is unavailable.
+      }
+    }
+
     async function logout() {
       await apiFetch('/api/auth/logout', { method: 'POST' });
       location.href = '/login';
@@ -371,7 +871,19 @@
       else if (name === 'users')    loadAdminUsers();
       else if (name === 'notifications') loadAdminNotifications();
       else if (name === 'pages')    loadAdminPages();
-      else if (name === 'config')   loadAdminConfig();
+      else if (name === 'settings') {
+        loadAdminConfig();
+        const first = document.querySelector('#settings-tabs .nav-link');
+        if (first) showSettingsSubTab('appearance', first);
+      }
+    }
+
+    function showSettingsSubTab(name, el) {
+      document.querySelectorAll('[id^="settings-subtab-"]').forEach(t => t.style.display = 'none');
+      document.querySelectorAll('#settings-tabs .nav-link').forEach(l => l.classList.remove('active'));
+      const target = document.getElementById('settings-subtab-' + name);
+      if (target) target.style.display = '';
+      if (el) el.classList.add('active');
     }
 
     function showChTab(name, el) {
@@ -433,7 +945,6 @@
       document.getElementById('ch-category').value     = c.category;
       document.getElementById('ch-description').value  = c.description;
       document.getElementById('ch-points').value       = c.points;
-      document.getElementById('ch-flag').value         = c.flag || '';
       document.getElementById('ch-flag-type').value    = (c.flag_type === 'static') ? 'exact' : (c.flag_type || 'exact');
       document.getElementById('ch-max-attempts').value = c.max_attempts || 0;
       document.getElementById('ch-connection-info').value = c.connection_info || '';
@@ -460,7 +971,6 @@
         category:        document.getElementById('ch-category').value,
         description:     document.getElementById('ch-description').value,
         points:          parseInt(document.getElementById('ch-points').value),
-        flag:            document.getElementById('ch-flag').value,
         flag_type:       document.getElementById('ch-flag-type').value,
         max_attempts:    parseInt(document.getElementById('ch-max-attempts').value) || 0,
         connection_info: document.getElementById('ch-connection-info').value,
@@ -790,6 +1300,156 @@
     // ══════════════════════════════════════
     // CONFIG
     // ══════════════════════════════════════
+    const settingsFieldMap = {
+      themeMeta: [
+        { id: 'cfg-theme-name', key: 'ctf_theme', kind: 'string' },
+        { id: 'cfg-theme-header', key: 'theme_header', kind: 'string' },
+        { id: 'cfg-theme-footer', key: 'theme_footer', kind: 'string' },
+        { id: 'cfg-theme-settings', key: 'theme_settings', kind: 'string' },
+      ],
+      accounts: [
+        { id: 'cfg-accounts-domain-whitelist', key: 'domain_whitelist', kind: 'string' },
+        { id: 'cfg-accounts-verify-emails', key: 'verify_emails', kind: 'boolSelect' },
+        { id: 'cfg-accounts-team-creation', key: 'team_creation', kind: 'boolSelect' },
+        { id: 'cfg-accounts-max-team-size', key: 'team_size', kind: 'int' },
+        { id: 'cfg-accounts-num-teams', key: 'num_teams', kind: 'int' },
+        { id: 'cfg-accounts-num-users', key: 'num_users', kind: 'int' },
+        { id: 'cfg-accounts-team-disbanding', key: 'team_disbanding', kind: 'string' },
+        { id: 'cfg-accounts-incorrect-submissions-per-min', key: 'incorrect_submissions_per_min', kind: 'int' },
+        { id: 'cfg-accounts-name-changes', key: 'name_changes', kind: 'boolSelect' },
+      ],
+      pages: [
+        { id: 'cfg-pages-robots-txt', key: 'robots_txt', kind: 'string' },
+      ],
+      brackets: [
+        { id: 'cfg-brackets-enabled', key: 'brackets_enabled', kind: 'bool' },
+        { id: 'cfg-brackets-type', key: 'brackets_type', kind: 'string' },
+      ],
+      customfields: [
+        { id: 'cfg-customfields-enabled', key: 'customfields_enabled', kind: 'bool' },
+        { id: 'cfg-customfields-required', key: 'customfields_required', kind: 'bool' },
+      ],
+      mlc: [
+        { id: 'cfg-mlc-client-id', key: 'oauth_client_id', kind: 'string' },
+        { id: 'cfg-mlc-client-secret', key: 'oauth_client_secret', kind: 'string' },
+      ],
+      settings: [
+        { id: 'cfg-settings-ctf-start', key: 'settings_ctf_start', kind: 'string' },
+        { id: 'cfg-settings-ctf-end', key: 'settings_ctf_end', kind: 'string' },
+        { id: 'cfg-settings-challenge-visibility', key: 'settings_challenge_visibility', kind: 'string' },
+        { id: 'cfg-settings-account-visibility', key: 'account_visibility', kind: 'string' },
+        { id: 'cfg-settings-score-visibility', key: 'score_visibility', kind: 'string' },
+        { id: 'cfg-settings-registration-visibility', key: 'registration_visibility', kind: 'string' },
+        { id: 'cfg-settings-paused', key: 'paused', kind: 'bool' },
+      ],
+      security: [
+        { id: 'cfg-security-html-sanitization', key: 'html_sanitization', kind: 'boolSelect' },
+        { id: 'cfg-security-registration-code', key: 'registration_code', kind: 'string' },
+      ],
+      email: [
+        { id: 'cfg-email-successful-registration-subject', key: 'successful_registration_email_subject', kind: 'string' },
+        { id: 'cfg-email-successful-registration-body', key: 'successful_registration_email_body', kind: 'string' },
+        { id: 'cfg-email-verification-subject', key: 'verification_email_subject', kind: 'string' },
+        { id: 'cfg-email-verification-body', key: 'verification_email_body', kind: 'string' },
+        { id: 'cfg-email-from-address', key: 'mailfrom_addr', kind: 'string' },
+        { id: 'cfg-email-smtp-host', key: 'mail_server', kind: 'string' },
+        { id: 'cfg-email-smtp-port', key: 'mail_port', kind: 'int' },
+        { id: 'cfg-email-smtp-user', key: 'mail_username', kind: 'string' },
+        { id: 'cfg-email-smtp-pass', key: 'mail_password', kind: 'string' },
+        { id: 'cfg-email-mail-useauth', key: 'mail_useauth', kind: 'bool' },
+        { id: 'cfg-email-mail-ssl', key: 'mail_ssl', kind: 'bool' },
+        { id: 'cfg-email-mail-tls', key: 'mail_tls', kind: 'bool' },
+      ],
+      time: [
+        { id: 'cfg-time-start-ts', key: 'start', kind: 'int' },
+        { id: 'cfg-time-end-ts', key: 'end', kind: 'int' },
+        { id: 'cfg-time-timezone', key: 'time_timezone', kind: 'string' },
+        { id: 'cfg-time-freeze-ts', key: 'freeze', kind: 'int' },
+        { id: 'cfg-time-view-after-ctf', key: 'view_after_ctf', kind: 'bool' },
+      ],
+      social: [
+        { id: 'cfg-social-shares', key: 'social_shares', kind: 'boolSelect' },
+        { id: 'cfg-social-discord', key: 'social_discord', kind: 'string' },
+        { id: 'cfg-social-twitter', key: 'social_twitter', kind: 'string' },
+        { id: 'cfg-social-website', key: 'social_website', kind: 'string' },
+      ],
+      legal: [
+        { id: 'cfg-legal-terms-url', key: 'legal_terms_url', kind: 'string' },
+        { id: 'cfg-legal-terms-text', key: 'tos_text', kind: 'string' },
+        { id: 'cfg-legal-privacy-url', key: 'legal_privacy_url', kind: 'string' },
+        { id: 'cfg-legal-privacy-text', key: 'privacy_text', kind: 'string' },
+        { id: 'cfg-legal-rules-url', key: 'legal_rules_url', kind: 'string' },
+      ],
+      backup: [
+        { id: 'cfg-backup-enabled', key: 'backup_enabled', kind: 'bool' },
+        { id: 'cfg-backup-schedule', key: 'backup_schedule', kind: 'string' },
+        { id: 'cfg-backup-retention-days', key: 'backup_retention_days', kind: 'int' },
+      ],
+      usermode: [
+        { id: 'cfg-usermode-teams', key: 'user_mode', kind: 'radioUserMode' },
+        { id: 'cfg-usermode-allow-switch', key: 'usermode_allow_switch', kind: 'bool' },
+      ],
+      reset: [
+        { id: 'cfg-reset-preserve-users', key: 'reset_preserve_users', kind: 'bool' },
+        { id: 'cfg-reset-preserve-teams', key: 'reset_preserve_teams', kind: 'bool' },
+      ],
+    };
+
+    function applyConfigField(id, kind, value) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (kind === 'radioUserMode') {
+        const mode = (value || 'users').toString();
+        const teams = document.getElementById('cfg-usermode-teams');
+        const users = document.getElementById('cfg-usermode-users');
+        if (teams && users) {
+          teams.checked = mode === 'teams';
+          users.checked = mode !== 'teams';
+        }
+        return;
+      }
+      if (kind === 'boolSelect') {
+        el.value = String(!!value);
+        return;
+      }
+      if (kind === 'bool') {
+        el.checked = !!value;
+        return;
+      }
+      el.value = value == null ? '' : String(value);
+    }
+
+    function collectConfigField(id, kind) {
+      const el = document.getElementById(id);
+      if (!el) return null;
+      if (kind === 'radioUserMode') {
+        const teams = document.getElementById('cfg-usermode-teams');
+        return teams && teams.checked ? 'teams' : 'users';
+      }
+      if (kind === 'boolSelect') return el.value === 'true';
+      if (kind === 'bool') return !!el.checked;
+      if (kind === 'int') {
+        const n = parseInt(el.value, 10);
+        return Number.isFinite(n) ? n : 0;
+      }
+      return el.value || '';
+    }
+
+    function setSectionMessage(section, ok, message) {
+      const errEl = document.getElementById('settings-' + section + '-error');
+      const okEl = document.getElementById('settings-' + section + '-success');
+      if (!errEl || !okEl) return;
+      errEl.classList.add('d-none');
+      okEl.classList.add('d-none');
+      if (ok) {
+        okEl.textContent = message;
+        okEl.classList.remove('d-none');
+      } else {
+        errEl.textContent = message;
+        errEl.classList.remove('d-none');
+      }
+    }
+
     async function loadAdminConfig() {
       try {
         const [cfg, theme] = await Promise.all([
@@ -797,10 +1457,25 @@
           apiFetch('/api/theme').catch(() => ({})),
         ]);
         document.getElementById('cfg-name').value        = cfg.ctf_name       || '';
-        document.getElementById('cfg-description').value = cfg.description    || '';
+        document.getElementById('cfg-description').value = cfg.ctf_description || cfg.description || '';
         document.getElementById('cfg-reg-open').checked  = !!cfg.registration_open;
         document.getElementById('cfg-team-mode').checked = !!cfg.team_mode;
-        document.getElementById('theme-vars').value      = JSON.stringify(theme, null, 2);
+        const teams = document.getElementById('cfg-usermode-teams');
+        const users = document.getElementById('cfg-usermode-users');
+        if (teams && users) {
+          teams.checked = String(cfg.user_mode || 'users') === 'teams';
+          users.checked = !teams.checked;
+        }
+        const normalizedTheme = (!theme || typeof theme !== 'object')
+          ? { name: 'default', vars: {} }
+          : ((theme.vars || theme.name || theme.custom_css || theme.custom_js)
+            ? theme
+            : { name: 'default', vars: theme });
+        document.getElementById('theme-vars').value      = JSON.stringify(normalizedTheme, null, 2);
+
+        Object.values(settingsFieldMap).flat().forEach(f => {
+          applyConfigField(f.id, f.kind, cfg[f.key]);
+        });
       } catch (err) {
         console.error('Config load error:', err);
       }
@@ -813,7 +1488,7 @@
       okEl.classList.add('d-none');
       const body = {
         ctf_name:          document.getElementById('cfg-name').value,
-        description:       document.getElementById('cfg-description').value,
+        ctf_description:   document.getElementById('cfg-description').value,
         registration_open: document.getElementById('cfg-reg-open').checked,
         team_mode:         document.getElementById('cfg-team-mode').checked,
       };
@@ -832,16 +1507,27 @@
       const okEl  = document.getElementById('theme-success');
       errEl.classList.add('d-none');
       okEl.classList.add('d-none');
-      let vars;
+      let theme;
       try {
-        vars = JSON.parse(document.getElementById('theme-vars').value);
+        theme = JSON.parse(document.getElementById('theme-vars').value);
       } catch (_) {
         errEl.textContent = 'Invalid JSON';
         errEl.classList.remove('d-none');
         return;
       }
+
+      if (!theme || typeof theme !== 'object') {
+        errEl.textContent = 'Theme must be a JSON object';
+        errEl.classList.remove('d-none');
+        return;
+      }
+
+      const payload = (theme.vars || theme.name || theme.custom_css || theme.custom_js)
+        ? theme
+        : { name: 'default', vars: theme };
+
       try {
-        await apiFetch('/api/admin/theme', { method: 'PUT', body: JSON.stringify(vars) });
+        await apiFetch('/api/admin/theme', { method: 'PUT', body: JSON.stringify(payload) });
         okEl.textContent = 'Theme saved!';
         okEl.classList.remove('d-none');
       } catch (err) {
@@ -850,11 +1536,28 @@
       }
     }
 
+    async function saveSettingsSection(section) {
+      const defs = settingsFieldMap[section] || [];
+      if (!defs.length) return;
+      const body = {};
+      defs.forEach(def => {
+        body[def.key] = collectConfigField(def.id, def.kind);
+      });
+      setSectionMessage(section, true, 'Saving...');
+      try {
+        await apiFetch('/api/admin/config', { method: 'PUT', body: JSON.stringify(body) });
+        setSectionMessage(section, true, 'Settings saved!');
+      } catch (err) {
+        setSectionMessage(section, false, err.message || 'Save failed');
+      }
+    }
+
     // ══════════════════════════════════════
     // INIT
     // ══════════════════════════════════════
     (async () => {
       await initI18n();
+      await loadPluginOptions();
       const user = await getMe();
       if (!user || user.role !== 'admin') { location.href = '/'; return; }
       loadAdminChallenges();

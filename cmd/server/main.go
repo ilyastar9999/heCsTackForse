@@ -15,6 +15,8 @@ import (
 	"github.com/ilyastar9999/heCsTackForse/internal/config"
 	"github.com/ilyastar9999/heCsTackForse/internal/db"
 	"github.com/ilyastar9999/heCsTackForse/internal/deployer"
+	"github.com/ilyastar9999/heCsTackForse/internal/plugin"
+	"github.com/ilyastar9999/heCsTackForse/internal/pluginbridge"
 )
 
 func main() {
@@ -38,6 +40,40 @@ func main() {
 		if err := database.Seed(); err != nil {
 			log.Printf("warning: challenge seeding failed: %v", err)
 		}
+	}
+
+	var bridge *pluginbridge.Bridge
+	if cfg.Plugins.Enabled {
+		var err error
+		bridge, err = pluginbridge.New(pluginbridge.Config{
+			Python:     cfg.Plugins.Python,
+			Script:     cfg.Plugins.Script,
+			PluginDirs: cfg.Plugins.PluginDirs,
+			Modules:    cfg.Plugins.Modules,
+		})
+		if err != nil {
+			log.Fatalf("failed to start plugin bridge: %v", err)
+		}
+		catalog := bridge.Catalog()
+		for _, name := range catalog.FlagCheckers {
+			plugin.Default.RegisterFlagChecker(bridge.FlagChecker(name))
+		}
+		for _, name := range catalog.Scorers {
+			plugin.Default.RegisterScorer(bridge.Scorer(name))
+		}
+		for _, name := range catalog.Notifiers {
+			plugin.Default.RegisterNotifier(bridge.Notifier(name))
+		}
+		for _, name := range catalog.ChallengeTypes {
+			plugin.Default.RegisterChallengeType(bridge.ChallengeType(name))
+		}
+		defer func() {
+			if err := bridge.Close(); err != nil {
+				log.Printf("warning: plugin bridge shutdown failed: %v", err)
+			}
+		}()
+		log.Printf("loaded plugin bridge: %d flag checkers, %d scorers, %d notifiers, %d challenge types",
+			len(catalog.FlagCheckers), len(catalog.Scorers), len(catalog.Notifiers), len(catalog.ChallengeTypes))
 	}
 
 	mgr := deployer.NewManager()

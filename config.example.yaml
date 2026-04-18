@@ -16,7 +16,7 @@ ctf:
   mode: ctf           # ctf | ad (attack & defence)
   team_mode: false
   registration_open: true
-  scoring: static     # static | dynamic
+  scoring: static     # static | dynamic | <custom scorer name>
   flag_prefix: "FLAG{"
   flag_suffix: "}"
   seed_challenges: true  # insert built-in sample tasks on first run (skipped if challenges already exist)
@@ -45,3 +45,10 @@ ad:
   round_duration: 5m
   flag_lifetime: 2
   teams: []
+
+plugins:
+  enabled: false
+  python: python
+  script: ./python/ctfd_bridge.py
+  plugin_dirs: []
+  modules: []

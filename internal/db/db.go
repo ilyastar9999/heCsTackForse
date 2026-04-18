@@ -115,4 +115,3 @@ func (d *DB) InsertGetID(query string, args ...any) (int64, error) {
 	}
 	return res.LastInsertId()
 }
-

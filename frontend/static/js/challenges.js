@@ -133,6 +133,7 @@ async function loadChallengeExtras(id, c) {
   } catch (_) {
     hintsSection.classList.add('d-none');
   }
+}
 
 async function loadInstanceStatus(challengeId) {
   const instBox = document.getElementById('modal-instance');

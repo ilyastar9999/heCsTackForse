@@ -7,11 +7,20 @@ import (
 )
 
 type Config struct {
-	Server   ServerConfig   `yaml:"server"`
-	Database DatabaseConfig `yaml:"database"`
-	CTF      CTFConfig      `yaml:"ctf"`
-	Deployer DeployerConfig `yaml:"deployer"`
-	AD       ADConfig       `yaml:"ad"`
+	Server   ServerConfig       `yaml:"server"`
+	Database DatabaseConfig     `yaml:"database"`
+	CTF      CTFConfig          `yaml:"ctf"`
+	Deployer DeployerConfig     `yaml:"deployer"`
+	AD       ADConfig           `yaml:"ad"`
+	Plugins  PluginBridgeConfig `yaml:"plugins"`
+}
+
+type PluginBridgeConfig struct {
+	Enabled    bool     `yaml:"enabled"`
+	Python     string   `yaml:"python"`
+	Script     string   `yaml:"script"`
+	PluginDirs []string `yaml:"plugin_dirs"`
+	Modules    []string `yaml:"modules"`
 }
 
 type ServerConfig struct {
@@ -75,11 +84,11 @@ type ADConfig struct {
 	RoundDuration  string    `yaml:"round_duration"`
 	FlagLifetime   int       `yaml:"flag_lifetime"`
 	Teams          []string  `yaml:"teams"`
-	FlagSubmitURL  string    `yaml:"flag_submit_url"`  // e.g. http://10.10.10.10/flags
-	FlagSubmitKey  string    `yaml:"flag_submit_key"`  // auth key/token for the central flag submitter
-	CheckerTimeout string    `yaml:"checker_timeout"`  // e.g. 30s
-	SploitTimeout  string    `yaml:"sploit_timeout"`   // e.g. 60s
-	SploitDir      string    `yaml:"sploit_dir"`       // writable dir for temp sploit files
+	FlagSubmitURL  string    `yaml:"flag_submit_url"` // e.g. http://10.10.10.10/flags
+	FlagSubmitKey  string    `yaml:"flag_submit_key"` // auth key/token for the central flag submitter
+	CheckerTimeout string    `yaml:"checker_timeout"` // e.g. 30s
+	SploitTimeout  string    `yaml:"sploit_timeout"`  // e.g. 60s
+	SploitDir      string    `yaml:"sploit_dir"`      // writable dir for temp sploit files
 	VPN            VPNConfig `yaml:"vpn"`
 }
 
