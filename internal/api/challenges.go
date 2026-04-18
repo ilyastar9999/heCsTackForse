@@ -54,16 +54,17 @@ func (s *Server) handleGetChallenge(c echo.Context) error {
 	userID := getUserID(c)
 	var ch models.Challenge
 	err = s.db.QueryRow(
-		`SELECT id, name, description, category, points, flag_type, deploy_type, deploy_backend, image, is_visible, created_at FROM challenges WHERE id=? AND is_visible`,
+		`SELECT id, name, description, category, points, flag_type, deploy_type, deploy_backend, image, is_visible, created_at,
+		(SELECT COUNT(*) FROM submissions WHERE challenge_id=challenges.id AND is_correct) as solve_count
+		FROM challenges WHERE id=? AND is_visible`,
 		id,
-	).Scan(&ch.ID, &ch.Name, &ch.Description, &ch.Category, &ch.Points, &ch.FlagType, &ch.DeployType, &ch.DeployBackend, &ch.Image, &ch.IsVisible, &ch.CreatedAt)
+	).Scan(&ch.ID, &ch.Name, &ch.Description, &ch.Category, &ch.Points, &ch.FlagType, &ch.DeployType, &ch.DeployBackend, &ch.Image, &ch.IsVisible, &ch.CreatedAt, &ch.SolveCount)
 	if err == sql.ErrNoRows {
 		return c.JSON(http.StatusNotFound, map[string]string{"error": "not found"})
 	}
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
 	}
-	_ = s.db.QueryRow("SELECT COUNT(*) FROM submissions WHERE challenge_id=? AND is_correct", id).Scan(&ch.SolveCount)
 	ch.Points = s.scoreChallenge(&ch, ch.SolveCount)
 	var cnt int
 	_ = s.db.QueryRow("SELECT COUNT(*) FROM submissions WHERE user_id=? AND challenge_id=? AND is_correct", userID, id).Scan(&cnt)

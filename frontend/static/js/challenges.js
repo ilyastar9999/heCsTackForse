@@ -39,7 +39,8 @@ async function openChallenge(id) {
     currentChallenge = c;
 
     document.getElementById('modal-title').textContent = c.name;
-    document.getElementById('modal-desc').textContent = c.description;
+    // Render markdown in description
+    document.getElementById('modal-desc').innerHTML = window.marked ? marked.parse(c.description || "") : escHtml(c.description || "");
     document.getElementById('modal-solves').textContent = c.solve_count + ' solve' + (c.solve_count !== 1 ? 's' : '');
 
     // Meta badges

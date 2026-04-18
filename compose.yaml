@@ -24,7 +24,7 @@ services:
       - "8080:8080"
     volumes:
       # Config file — edit docker/config.yaml before first run
-      - ./docker/config.yaml:/app/config.yaml:ro
+      - ./config.yaml:/app/config.yaml:ro
       # Writable volume for A&D sploit temp files
       - sploits:/tmp/sploits
     depends_on:
