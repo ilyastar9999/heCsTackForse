@@ -1,0 +1,10 @@
+*.db
+*.db-shm
+*.db-wal
+config.yaml
+/ctf
+# build artifacts
+/server
+
+# Docker secrets (override per-environment; keep docker/config.yaml template)
+docker/.env

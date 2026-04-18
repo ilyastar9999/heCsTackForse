@@ -1,0 +1,1575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin – heCsTackForse</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg sticky-top">
+    <div class="container-fluid px-4">
+      <a class="navbar-brand" href="/">heCsTackForse</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navMenu">
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item"><a class="nav-link" data-i18n="nav.challenges" href="/challenges">Challenges</a></li>
+          <li class="nav-item"><a class="nav-link" data-i18n="nav.scoreboard" href="/scoreboard">Scoreboard</a></li>
+        </ul>
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item"><a class="nav-link active" data-i18n="nav.admin" href="/admin">Admin</a></li>
+          <li class="nav-item"><a class="nav-link" href="/admin/plugins">Plugins</a></li>
+          <li class="nav-item"><a class="nav-link" data-i18n="nav.profile" href="/profile">Profile</a></li>
+          <li class="nav-item"><a class="nav-link" data-i18n="nav.logout" href="#" onclick="logout()">Logout</a></li>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown"><span id="lang-toggle-label">EN</span></a>
+            <ul class="dropdown-menu dropdown-menu-end" style="min-width:120px">
+              <li><a class="dropdown-item" href="#" onclick="setLang('en');return false">English</a></li>
+              <li><a class="dropdown-item" href="#" onclick="setLang('ru');return false">Русский</a></li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="page-container">
+    <h1 class="page-title" data-i18n="admin.panel">Admin Panel</h1>
+
+    <ul class="nav nav-tabs mb-4">
+      <li class="nav-item">
+        <a class="nav-link active" href="#" onclick="showTab('challenges',this)" data-i18n="admin.challenges">Challenges</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="#" onclick="showTab('users',this)" data-i18n="admin.users">Users</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="#" onclick="showTab('notifications',this)" data-i18n="admin.notifications">Notifications</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="#" onclick="showTab('pages',this)" data-i18n="admin.pages">Pages</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="#" onclick="showTab('settings',this)">Settings</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="/admin/plugins">Plugins</a>
+      </li>
+    </ul>
+
+    <!-- ═══ Challenges Tab ═══ -->
+    <div id="tab-challenges">
+      <div class="mb-3">
+        <button class="btn btn-primary" onclick="openCreateChallenge()" data-i18n="admin.new_challenge">+ New Challenge</button>
+      </div>
+      <div class="card p-0">
+        <table class="admin-table">
+          <thead>
+            <tr><th>ID</th><th>Name</th><th>Category</th><th>Points</th><th>Flag Type</th><th>Deploy</th><th>Visible</th><th>Actions</th></tr>
+          </thead>
+          <tbody id="challenges-body">
+            <tr><td colspan="8" class="text-center py-3 text-muted">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ═══ Users Tab ═══ -->
+    <div id="tab-users" style="display:none">
+      <div class="card p-0">
+        <table class="admin-table">
+          <thead>
+            <tr><th>ID</th><th>Username</th><th>Email</th><th>Role</th><th>Score</th><th>Verified</th><th>Hidden</th><th>Status</th><th>Actions</th></tr>
+          </thead>
+          <tbody id="users-body">
+            <tr><td colspan="9" class="text-center py-3 text-muted">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ═══ Notifications Tab ═══ -->
+    <div id="tab-notifications" style="display:none">
+      <div class="row g-4">
+        <div class="col-md-5">
+          <div class="card p-4">
+            <h5 class="mb-3" data-i18n="notifications.new">New Notification</h5>
+            <div class="mb-3">
+              <label class="form-label" data-i18n="notifications.title_label">Title</label>
+              <input type="text" class="form-control" id="notif-title">
+            </div>
+            <div class="mb-3">
+              <label class="form-label" data-i18n="notifications.content_label">Content</label>
+              <textarea class="form-control" id="notif-content" rows="4"></textarea>
+            </div>
+            <button class="btn btn-primary" onclick="createNotification()" data-i18n="notifications.create">Create</button>
+          </div>
+        </div>
+        <div class="col-md-7">
+          <div id="notif-list-container">
+            <div class="text-muted text-center py-4">Loading…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ Pages Tab ═══ -->
+    <div id="tab-pages" style="display:none">
+      <div class="row g-4">
+        <div class="col-md-5">
+          <div class="card p-4">
+            <h5 class="mb-3" id="page-form-title" data-i18n="pages.new">New Page</h5>
+            <input type="hidden" id="page-id">
+            <div class="mb-3">
+              <label class="form-label" data-i18n="pages.title_label">Title</label>
+              <input type="text" class="form-control" id="page-title">
+            </div>
+            <div class="mb-3">
+              <label class="form-label" data-i18n="pages.slug_label">Slug</label>
+              <input type="text" class="form-control" id="page-slug" placeholder="e.g. about">
+            </div>
+            <div class="mb-3">
+              <label class="form-label" data-i18n="pages.content_label">Content (HTML)</label>
+              <textarea class="form-control" id="page-content" rows="6"></textarea>
+            </div>
+            <div class="form-check mb-3">
+              <input class="form-check-input" type="checkbox" id="page-draft">
+              <label class="form-check-label" for="page-draft" data-i18n="pages.draft_label">Draft</label>
+            </div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-primary" onclick="savePage()" data-i18n="pages.save">Save Page</button>
+              <button class="btn btn-secondary" onclick="resetPageForm()" data-i18n="admin.cancel">Cancel</button>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-7">
+          <div id="pages-list-container">
+            <div class="text-muted text-center py-4">Loading…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ Settings Tab ═══ -->
+    <div id="tab-settings" style="display:none">
+      <ul class="nav nav-pills flex-wrap gap-2 mb-4" id="settings-tabs">
+        <li class="nav-item"><a class="nav-link active" href="#" onclick="showSettingsSubTab('appearance',this)">Appearance</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="showSettingsSubTab('theme',this)">Theme</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="showSettingsSubTab('accounts',this)">Accounts</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="showSettingsSubTab('pages',this)">Pages</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="showSettingsSubTab('brackets',this)">Brackets</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="showSettingsSubTab('customfields',this)">Custom Fields</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="showSettingsSubTab('mlc',this)">MajorLeagueCyber</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="showSettingsSubTab('settings',this)">Settings</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="showSettingsSubTab('security',this)">Security</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="showSettingsSubTab('email',this)">Email</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="showSettingsSubTab('time',this)">Time</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="showSettingsSubTab('social',this)">Social</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="showSettingsSubTab('legal',this)">Legal</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="showSettingsSubTab('backup',this)">Backup</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="showSettingsSubTab('usermode',this)">User Mode</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="showSettingsSubTab('reset',this)">Reset</a></li>
+      </ul>
+
+      <div id="settings-subtab-appearance">
+        <div class="card p-4 mb-4">
+          <h5 class="mb-3" data-i18n="admin.config">General Settings</h5>
+          <div class="mb-3">
+            <label class="form-label" data-i18n="admin.ctf_name">CTF Name</label>
+            <input type="text" class="form-control" id="cfg-name">
+          </div>
+          <div class="mb-3">
+            <label class="form-label" data-i18n="admin.ctf_description">CTF Description</label>
+            <textarea class="form-control" id="cfg-description" rows="3"></textarea>
+          </div>
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="cfg-reg-open">
+            <label class="form-check-label" for="cfg-reg-open" data-i18n="admin.registration_open">Registration Open</label>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="cfg-team-mode">
+            <label class="form-check-label" for="cfg-team-mode" data-i18n="admin.team_mode">Team Mode</label>
+          </div>
+          <div id="cfg-error" class="alert alert-danger d-none"></div>
+          <div id="cfg-success" class="alert alert-success d-none"></div>
+          <button class="btn btn-primary" onclick="saveConfig()" data-i18n="admin.config_save">Save Config</button>
+        </div>
+      </div>
+
+      <div id="settings-subtab-theme" style="display:none">
+        <div class="card p-4 mb-4">
+          <h5 class="mb-3">Theme</h5>
+          <div class="mb-3">
+            <label class="form-label">Theme Name</label>
+            <input type="text" class="form-control" id="cfg-theme-name" placeholder="core">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Theme Header</label>
+            <textarea class="form-control font-monospace" id="cfg-theme-header" rows="4" placeholder="Inserted before </head>"></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Theme Footer</label>
+            <textarea class="form-control font-monospace" id="cfg-theme-footer" rows="4" placeholder="Inserted before </body>"></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Theme Settings (JSON)</label>
+            <textarea class="form-control font-monospace" id="cfg-theme-settings" rows="6">{}</textarea>
+          </div>
+          <label class="form-label" data-i18n="admin.theme_vars">CSS Variables (JSON)</label>
+          <textarea class="form-control font-monospace" id="theme-vars" rows="10" style="font-size:.82rem">{}</textarea>
+          <div id="theme-error" class="alert alert-danger d-none mt-2"></div>
+          <div id="theme-success" class="alert alert-success d-none mt-2"></div>
+          <button class="btn btn-primary mt-3" onclick="saveSettingsSection('themeMeta')">Save Theme Meta</button>
+          <button class="btn btn-outline-primary mt-3 ms-2" onclick="saveTheme()" data-i18n="admin.theme_save">Save CSS Theme Vars</button>
+        </div>
+      </div>
+
+      <div id="settings-subtab-accounts" style="display:none">
+        <div class="card p-4 mb-4">
+          <h5 class="mb-3">Accounts</h5>
+          <div class="mb-3">
+            <label class="form-label">Account Email Whitelist</label>
+            <input type="text" class="form-control" id="cfg-accounts-domain-whitelist" placeholder="ctfd.io, example.com, *.example.com">
+          </div>
+          <div class="row g-3 mb-2">
+            <div class="col-md-6">
+              <label class="form-label">Verify Emails</label>
+              <select class="form-select" id="cfg-accounts-verify-emails">
+                <option value="true">Enabled</option>
+                <option value="false">Disabled</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Team Creation</label>
+              <select class="form-select" id="cfg-accounts-team-creation">
+                <option value="true">Enabled</option>
+                <option value="false">Disabled</option>
+              </select>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Team Size</label>
+            <input type="number" min="1" class="form-control" id="cfg-accounts-max-team-size">
+          </div>
+          <div class="row g-3 mb-2">
+            <div class="col-md-6">
+              <label class="form-label">Total Number of Teams</label>
+              <input type="number" min="0" class="form-control" id="cfg-accounts-num-teams">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Total Number of Users</label>
+              <input type="number" min="0" class="form-control" id="cfg-accounts-num-users">
+            </div>
+          </div>
+          <div class="row g-3 mb-2">
+            <div class="col-md-6">
+              <label class="form-label">Team Disbanding</label>
+              <select class="form-select" id="cfg-accounts-team-disbanding">
+                <option value="inactive_only">Enabled for Inactive Teams</option>
+                <option value="disabled">Disabled</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Incorrect Submissions per Minute</label>
+              <input type="number" min="1" class="form-control" id="cfg-accounts-incorrect-submissions-per-min">
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Name Changes</label>
+            <select class="form-select" id="cfg-accounts-name-changes">
+              <option value="true">Enabled</option>
+              <option value="false">Disabled</option>
+            </select>
+          </div>
+          <div id="settings-accounts-error" class="alert alert-danger d-none"></div>
+          <div id="settings-accounts-success" class="alert alert-success d-none"></div>
+          <button class="btn btn-primary" onclick="saveSettingsSection('accounts')">Save Accounts</button>
+        </div>
+      </div>
+
+      <div id="settings-subtab-pages" style="display:none">
+        <div class="card p-4 mb-4">
+          <h5 class="mb-3">Pages</h5>
+          <div class="mb-3">
+            <label class="form-label">Robots.txt</label>
+            <textarea class="form-control font-monospace" id="cfg-pages-robots-txt" rows="8" placeholder="User-agent: *\nDisallow: /admin"></textarea>
+          </div>
+          <div id="settings-pages-error" class="alert alert-danger d-none"></div>
+          <div id="settings-pages-success" class="alert alert-success d-none"></div>
+          <button class="btn btn-primary" onclick="saveSettingsSection('pages')">Save Pages</button>
+        </div>
+      </div>
+
+      <div id="settings-subtab-brackets" style="display:none">
+        <div class="card p-4 mb-4">
+          <h5 class="mb-3">Brackets</h5>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="cfg-brackets-enabled">
+            <label class="form-check-label" for="cfg-brackets-enabled">Enable Brackets</label>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Bracket Type</label>
+            <select class="form-select" id="cfg-brackets-type">
+              <option value="single_elimination">Single Elimination</option>
+              <option value="double_elimination">Double Elimination</option>
+              <option value="round_robin">Round Robin</option>
+            </select>
+          </div>
+          <div id="settings-brackets-error" class="alert alert-danger d-none"></div>
+          <div id="settings-brackets-success" class="alert alert-success d-none"></div>
+          <button class="btn btn-primary" onclick="saveSettingsSection('brackets')">Save Brackets</button>
+        </div>
+      </div>
+
+      <div id="settings-subtab-customfields" style="display:none">
+        <div class="card p-4 mb-4">
+          <h5 class="mb-3">Custom Fields</h5>
+          <div class="text-muted mb-3">Manage real custom fields in the dedicated user fields admin endpoints.</div>
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="cfg-customfields-enabled">
+            <label class="form-check-label" for="cfg-customfields-enabled">Enable Custom Fields</label>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="cfg-customfields-required">
+            <label class="form-check-label" for="cfg-customfields-required">Require Custom Fields on Registration</label>
+          </div>
+          <div id="settings-customfields-error" class="alert alert-danger d-none"></div>
+          <div id="settings-customfields-success" class="alert alert-success d-none"></div>
+          <button class="btn btn-primary" onclick="saveSettingsSection('customfields')">Save Custom Fields</button>
+        </div>
+      </div>
+
+      <div id="settings-subtab-mlc" style="display:none">
+        <div class="card p-4 mb-4">
+          <h5 class="mb-3">MajorLeagueCyber</h5>
+          <div class="mb-3">
+            <label class="form-label">OAuth Client ID</label>
+            <input type="text" class="form-control" id="cfg-mlc-client-id">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">OAuth Client Secret</label>
+            <input type="text" class="form-control" id="cfg-mlc-client-secret">
+          </div>
+          <div id="settings-mlc-error" class="alert alert-danger d-none"></div>
+          <div id="settings-mlc-success" class="alert alert-success d-none"></div>
+          <button class="btn btn-primary" onclick="saveSettingsSection('mlc')">Save MajorLeagueCyber</button>
+        </div>
+      </div>
+
+      <div id="settings-subtab-settings" style="display:none">
+        <div class="card p-4 mb-4">
+          <h5 class="mb-3">Settings</h5>
+          <div class="row g-3 mb-2">
+            <div class="col-md-6">
+              <label class="form-label">Challenge Visibility</label>
+              <select class="form-select" id="cfg-settings-challenge-visibility">
+                <option value="public">Public</option>
+                <option value="private">Private</option>
+                <option value="admins">Admins Only</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Account Visibility</label>
+              <select class="form-select" id="cfg-settings-account-visibility">
+                <option value="public">Public</option>
+                <option value="private">Private</option>
+                <option value="admins">Admins Only</option>
+              </select>
+            </div>
+          </div>
+          <div class="row g-3 mb-2">
+            <div class="col-md-6">
+              <label class="form-label">Score Visibility</label>
+              <select class="form-select" id="cfg-settings-score-visibility">
+                <option value="public">Public</option>
+                <option value="private">Private</option>
+                <option value="hidden">Hidden</option>
+                <option value="admins">Admins Only</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Registration Visibility</label>
+              <select class="form-select" id="cfg-settings-registration-visibility">
+                <option value="public">Public</option>
+                <option value="private">Private</option>
+                <option value="mlc">MajorLeagueCyber Only</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="cfg-settings-paused">
+            <label class="form-check-label" for="cfg-settings-paused">Pause CTF</label>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Legacy CTF Start (ISO datetime)</label>
+            <input type="text" class="form-control" id="cfg-settings-ctf-start" placeholder="2026-04-20T10:00:00Z">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Legacy CTF End (ISO datetime)</label>
+            <input type="text" class="form-control" id="cfg-settings-ctf-end" placeholder="2026-04-21T10:00:00Z">
+          </div>
+          <div class="mb-3 d-none">
+            <select class="form-select" id="cfg-settings-challenge-visibility-hidden">
+              <option value="public">Public</option>
+              <option value="private">Private</option>
+              <option value="admins_only">Admins Only</option>
+            </select>
+          </div>
+          <div id="settings-settings-error" class="alert alert-danger d-none"></div>
+          <div id="settings-settings-success" class="alert alert-success d-none"></div>
+          <button class="btn btn-primary" onclick="saveSettingsSection('settings')">Save Settings</button>
+        </div>
+      </div>
+
+      <div id="settings-subtab-security" style="display:none">
+        <div class="card p-4 mb-4">
+          <h5 class="mb-3">Security</h5>
+          <div class="mb-3">
+            <label class="form-label">HTML Sanitization</label>
+            <select class="form-select" id="cfg-security-html-sanitization">
+              <option value="true">Enabled</option>
+              <option value="false">Disabled</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Registration Code</label>
+            <input type="text" class="form-control" id="cfg-security-registration-code">
+          </div>
+          <div id="settings-security-error" class="alert alert-danger d-none"></div>
+          <div id="settings-security-success" class="alert alert-success d-none"></div>
+          <button class="btn btn-primary" onclick="saveSettingsSection('security')">Save Security</button>
+        </div>
+      </div>
+
+      <div id="settings-subtab-email" style="display:none">
+        <div class="card p-4 mb-4">
+          <h5 class="mb-3">Email</h5>
+          <div class="mb-3">
+            <label class="form-label">Successful Registration Subject</label>
+            <input type="text" class="form-control" id="cfg-email-successful-registration-subject">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Successful Registration Body</label>
+            <textarea class="form-control" id="cfg-email-successful-registration-body" rows="4"></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Verification Subject</label>
+            <input type="text" class="form-control" id="cfg-email-verification-subject">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Verification Body</label>
+            <textarea class="form-control" id="cfg-email-verification-body" rows="4"></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Mail From Address</label>
+            <input type="email" class="form-control" id="cfg-email-from-address">
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Mail Server Address</label>
+              <input type="text" class="form-control" id="cfg-email-smtp-host">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Mail Server Port</label>
+              <input type="number" min="1" class="form-control" id="cfg-email-smtp-port">
+            </div>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Mail Server Username</label>
+              <input type="text" class="form-control" id="cfg-email-smtp-user">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Mail Server Password</label>
+              <input type="password" class="form-control" id="cfg-email-smtp-pass">
+            </div>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-md-4">
+              <div class="form-check mt-2">
+                <input class="form-check-input" type="checkbox" id="cfg-email-mail-useauth">
+                <label class="form-check-label" for="cfg-email-mail-useauth">Use Auth</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-check mt-2">
+                <input class="form-check-input" type="checkbox" id="cfg-email-mail-ssl">
+                <label class="form-check-label" for="cfg-email-mail-ssl">TLS/SSL</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-check mt-2">
+                <input class="form-check-input" type="checkbox" id="cfg-email-mail-tls">
+                <label class="form-check-label" for="cfg-email-mail-tls">STARTTLS</label>
+              </div>
+            </div>
+          </div>
+          <div id="settings-email-error" class="alert alert-danger d-none"></div>
+          <div id="settings-email-success" class="alert alert-success d-none"></div>
+          <button class="btn btn-primary" onclick="saveSettingsSection('email')">Save Email</button>
+        </div>
+      </div>
+
+      <div id="settings-subtab-time" style="display:none">
+        <div class="card p-4 mb-4">
+          <h5 class="mb-3">Time</h5>
+          <div class="mb-3">
+            <label class="form-label">Start Timestamp (UTC)</label>
+            <input type="number" class="form-control" id="cfg-time-start-ts">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">End Timestamp (UTC)</label>
+            <input type="number" class="form-control" id="cfg-time-end-ts">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Timezone</label>
+            <input type="text" class="form-control" id="cfg-time-timezone" placeholder="UTC">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Freeze Timestamp (UTC)</label>
+            <input type="number" class="form-control" id="cfg-time-freeze-ts">
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="cfg-time-view-after-ctf">
+            <label class="form-check-label" for="cfg-time-view-after-ctf">View After CTF</label>
+          </div>
+          <div id="settings-time-error" class="alert alert-danger d-none"></div>
+          <div id="settings-time-success" class="alert alert-success d-none"></div>
+          <button class="btn btn-primary" onclick="saveSettingsSection('time')">Save Time</button>
+        </div>
+      </div>
+
+      <div id="settings-subtab-social" style="display:none">
+        <div class="card p-4 mb-4">
+          <h5 class="mb-3">Social</h5>
+          <div class="mb-3">
+            <label class="form-label">Social Shares</label>
+            <select class="form-select" id="cfg-social-shares">
+              <option value="true">Enabled</option>
+              <option value="false">Disabled</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Discord URL</label>
+            <input type="url" class="form-control" id="cfg-social-discord">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Twitter/X URL</label>
+            <input type="url" class="form-control" id="cfg-social-twitter">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Website URL</label>
+            <input type="url" class="form-control" id="cfg-social-website">
+          </div>
+          <div id="settings-social-error" class="alert alert-danger d-none"></div>
+          <div id="settings-social-success" class="alert alert-success d-none"></div>
+          <button class="btn btn-primary" onclick="saveSettingsSection('social')">Save Social</button>
+        </div>
+      </div>
+
+      <div id="settings-subtab-legal" style="display:none">
+        <div class="card p-4 mb-4">
+          <h5 class="mb-3">Legal</h5>
+          <div class="mb-3">
+            <label class="form-label">Terms URL</label>
+            <input type="url" class="form-control" id="cfg-legal-terms-url">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Terms Text</label>
+            <textarea class="form-control" id="cfg-legal-terms-text" rows="6"></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Privacy URL</label>
+            <input type="url" class="form-control" id="cfg-legal-privacy-url">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Privacy Text</label>
+            <textarea class="form-control" id="cfg-legal-privacy-text" rows="6"></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Rules URL</label>
+            <input type="url" class="form-control" id="cfg-legal-rules-url">
+          </div>
+          <div id="settings-legal-error" class="alert alert-danger d-none"></div>
+          <div id="settings-legal-success" class="alert alert-success d-none"></div>
+          <button class="btn btn-primary" onclick="saveSettingsSection('legal')">Save Legal</button>
+        </div>
+      </div>
+
+      <div id="settings-subtab-backup" style="display:none">
+        <div class="card p-4 mb-4">
+          <h5 class="mb-3">Backup</h5>
+          <div class="d-flex gap-2 mb-3 flex-wrap">
+            <a class="btn btn-warning" href="/admin/export">Export</a>
+            <a class="btn btn-outline-warning" href="/admin/export/csv?table=scoreboard">Download CSV</a>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="cfg-backup-enabled">
+            <label class="form-check-label" for="cfg-backup-enabled">Enable Backups</label>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Backup Schedule (cron)</label>
+            <input type="text" class="form-control" id="cfg-backup-schedule" placeholder="0 3 * * *">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Retention (days)</label>
+            <input type="number" min="1" class="form-control" id="cfg-backup-retention-days">
+          </div>
+          <div id="settings-backup-error" class="alert alert-danger d-none"></div>
+          <div id="settings-backup-success" class="alert alert-success d-none"></div>
+          <button class="btn btn-primary" onclick="saveSettingsSection('backup')">Save Backup</button>
+        </div>
+      </div>
+
+      <div id="settings-subtab-usermode" style="display:none">
+        <div class="card p-4 mb-4">
+          <h5 class="mb-3">User Mode</h5>
+          <div class="mb-3">
+            <label class="form-label d-block">Mode</label>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="cfg-usermode-mode" id="cfg-usermode-teams" value="teams">
+              <label class="form-check-label" for="cfg-usermode-teams">Team Mode</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="cfg-usermode-mode" id="cfg-usermode-users" value="users">
+              <label class="form-check-label" for="cfg-usermode-users">User Mode</label>
+            </div>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="cfg-usermode-allow-switch">
+            <label class="form-check-label" for="cfg-usermode-allow-switch">Allow Users To Switch Mode</label>
+          </div>
+          <div id="settings-usermode-error" class="alert alert-danger d-none"></div>
+          <div id="settings-usermode-success" class="alert alert-success d-none"></div>
+          <button class="btn btn-primary" onclick="saveSettingsSection('usermode')">Save User Mode</button>
+        </div>
+      </div>
+
+      <div id="settings-subtab-reset" style="display:none">
+        <div class="card p-4 mb-4">
+          <h5 class="mb-3">Reset Parameters</h5>
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="cfg-reset-preserve-users">
+            <label class="form-check-label" for="cfg-reset-preserve-users">Preserve Users</label>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="cfg-reset-preserve-teams">
+            <label class="form-check-label" for="cfg-reset-preserve-teams">Preserve Teams</label>
+          </div>
+          <div id="settings-reset-error" class="alert alert-danger d-none"></div>
+          <div id="settings-reset-success" class="alert alert-success d-none"></div>
+          <button class="btn btn-primary" onclick="saveSettingsSection('reset')">Save Reset Params</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════ Challenge Modal ═══════════════════════ -->
+  <div class="modal fade" id="ch-modal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="ch-modal-title">New Challenge</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <ul class="nav nav-tabs mb-3" id="ch-tabs">
+            <li class="nav-item"><a class="nav-link active" href="#" onclick="showChTab('basic',this)">Basic</a></li>
+            <li class="nav-item"><a class="nav-link" href="#" onclick="showChTab('flags',this)">Flags</a></li>
+            <li class="nav-item"><a class="nav-link" href="#" onclick="showChTab('hints',this)">Hints</a></li>
+            <li class="nav-item"><a class="nav-link" href="#" onclick="showChTab('files',this)">Files</a></li>
+          </ul>
+
+          <form id="ch-form" onsubmit="saveChallengeForm(event)">
+            <input type="hidden" id="ch-id">
+
+            <!-- Basic tab -->
+            <div id="chtab-basic">
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <label class="form-label">Name</label>
+                  <input type="text" class="form-control" id="ch-name" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Category</label>
+                  <input type="text" class="form-control" id="ch-category" required>
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Description</label>
+                <textarea class="form-control" id="ch-description" rows="4" required></textarea>
+              </div>
+              <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                  <label class="form-label">Points</label>
+                  <input type="number" class="form-control" id="ch-points" value="100" required>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label" data-i18n="admin.max_attempts">Max Attempts (0 = unlimited)</label>
+                  <input type="number" class="form-control" id="ch-max-attempts" value="0" min="0">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Flag Type / Checker</label>
+                  <select class="form-select" id="ch-flag-type">
+                    <option value="exact">Exact (static)</option>
+                    <option value="regex">Regex</option>
+                    <option value="case_insensitive">Case-Insensitive</option>
+                    <option value="prefix">Prefix</option>
+                  </select>
+                </div>
+              </div>
+              <!-- Flag (primary) field removed -->
+              <div class="mb-3">
+                <label class="form-label" data-i18n="admin.connection_info">Connection Info</label>
+                <textarea class="form-control font-monospace" id="ch-connection-info" rows="2" placeholder="nc host 1234"></textarea>
+              </div>
+              <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                  <label class="form-label">Deploy Type</label>
+                  <select class="form-select" id="ch-deploy-type">
+                    <option value="no_deploy">No Deploy</option>
+                    <option value="single_instance">Single Instance</option>
+                    <option value="per_user">Per User</option>
+                    <option value="attack_defence">Attack &amp; Defence</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Deploy Backend</label>
+                  <select class="form-select" id="ch-deploy-backend">
+                    <option value="">None</option>
+                    <option value="docker">Docker</option>
+                    <option value="kubernetes">Kubernetes</option>
+                    <option value="pve">Proxmox VE</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Image</label>
+                  <input type="text" class="form-control" id="ch-image" placeholder="docker image">
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Deploy Config (JSON)</label>
+                <textarea class="form-control" id="ch-deploy-config" rows="2">{}</textarea>
+              </div>
+              <div class="form-check mb-3">
+                <input class="form-check-input" type="checkbox" id="ch-visible" checked>
+                <label class="form-check-label" for="ch-visible">Visible to players</label>
+              </div>
+            </div>
+
+            <!-- Flags tab -->
+            <div id="chtab-flags" style="display:none">
+              <div class="alert alert-info" data-i18n="admin.flags_note" id="flags-note">Flags can be managed after the challenge is saved.</div>
+              <div id="flags-list" class="mb-3"></div>
+              <div class="row g-2 mb-2">
+                <div class="col-md-8">
+                  <input type="text" class="form-control" id="new-flag-content" placeholder="FLAG{...}">
+                </div>
+                <div class="col-md-2">
+                  <select class="form-select" id="new-flag-type">
+                    <option value="exact">Exact</option>
+                    <option value="regex">Regex</option>
+                    <option value="case_insensitive">Case-Insensitive</option>
+                  </select>
+                </div>
+                <div class="col-md-2">
+                  <button type="button" class="btn btn-primary w-100" onclick="addFlag()" data-i18n="admin.add_flag">Add Flag</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Hints tab -->
+            <div id="chtab-hints" style="display:none">
+              <div class="alert alert-info" id="hints-note">Hints can be managed after the challenge is saved.</div>
+              <div id="hints-list" class="mb-3"></div>
+              <div class="row g-2 mb-2">
+                <div class="col-md-6">
+                  <input type="text" class="form-control" id="new-hint-content" placeholder="Hint text…">
+                </div>
+                <div class="col-md-2">
+                  <input type="number" class="form-control" id="new-hint-cost" value="0" min="0" placeholder="Cost">
+                </div>
+                <div class="col-md-4">
+                  <button type="button" class="btn btn-primary w-100" onclick="addHint()" data-i18n="admin.add_hint">Add Hint</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Files tab -->
+            <div id="chtab-files" style="display:none">
+              <div class="alert alert-info" id="files-note">Files can be managed after the challenge is saved.</div>
+              <div id="files-list" class="mb-3"></div>
+              <div class="d-flex gap-2 align-items-center">
+                <input type="file" class="form-control" id="file-upload" multiple>
+                <button type="button" class="btn btn-primary" onclick="uploadFiles()">Upload</button>
+              </div>
+            </div>
+
+            <div id="ch-error" class="alert alert-danger d-none mt-3"></div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="admin.cancel">Cancel</button>
+          <button type="submit" form="ch-form" class="btn btn-primary" data-i18n="admin.save">Save Challenge</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/i18n.js"></script>
+  <script>
+    let chBsModal = null;
+    let _currentChId = null;
+
+    function escHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function pluginLabel(name) {
+      const labels = {
+        exact: 'Exact (static)',
+        regex: 'Regex',
+        case_insensitive: 'Case-Insensitive',
+        prefix: 'Prefix',
+      };
+      if (labels[name]) return labels[name];
+      return name.replace(/[_-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    }
+
+    async function loadPluginOptions() {
+      try {
+        const plugins = await apiFetch('/api/plugins');
+        const flagCheckers = Array.isArray(plugins.flag_checkers) ? plugins.flag_checkers : [];
+        const flagSelect = document.getElementById('ch-flag-type');
+        const newFlagSelect = document.getElementById('new-flag-type');
+        const options = flagCheckers.map(name => `<option value="${escHtml(name)}">${escHtml(pluginLabel(name))}</option>`).join('');
+        if (flagSelect) flagSelect.innerHTML = options || flagSelect.innerHTML;
+        if (newFlagSelect) newFlagSelect.innerHTML = options || newFlagSelect.innerHTML;
+      } catch (_) {
+        // Keep the built-in fallback options when the registry endpoint is unavailable.
+      }
+    }
+
+    async function logout() {
+      await apiFetch('/api/auth/logout', { method: 'POST' });
+      location.href = '/login';
+    }
+
+    // ── Tab management ──
+    function showTab(name, el) {
+      document.querySelectorAll('[id^="tab-"]').forEach(t => t.style.display = 'none');
+      document.querySelectorAll('.nav-tabs:not(#ch-tabs) .nav-link').forEach(l => l.classList.remove('active'));
+      document.getElementById('tab-' + name).style.display = '';
+      el.classList.add('active');
+      if (name === 'challenges')    loadAdminChallenges();
+      else if (name === 'users')    loadAdminUsers();
+      else if (name === 'notifications') loadAdminNotifications();
+      else if (name === 'pages')    loadAdminPages();
+      else if (name === 'settings') {
+        loadAdminConfig();
+        const first = document.querySelector('#settings-tabs .nav-link');
+        if (first) showSettingsSubTab('appearance', first);
+      }
+    }
+
+    function showSettingsSubTab(name, el) {
+      document.querySelectorAll('[id^="settings-subtab-"]').forEach(t => t.style.display = 'none');
+      document.querySelectorAll('#settings-tabs .nav-link').forEach(l => l.classList.remove('active'));
+      const target = document.getElementById('settings-subtab-' + name);
+      if (target) target.style.display = '';
+      if (el) el.classList.add('active');
+    }
+
+    function showChTab(name, el) {
+      ['basic','flags','hints','files'].forEach(n => {
+        document.getElementById('chtab-' + n).style.display = n === name ? '' : 'none';
+      });
+      document.querySelectorAll('#ch-tabs .nav-link').forEach(l => l.classList.remove('active'));
+      el.classList.add('active');
+      if (name === 'flags' && _currentChId) loadFlags(_currentChId);
+      if (name === 'hints' && _currentChId) loadHints(_currentChId);
+      if (name === 'files' && _currentChId) loadAdminFiles(_currentChId);
+    }
+
+    // ══════════════════════════════════════
+    // CHALLENGES
+    // ══════════════════════════════════════
+    async function loadAdminChallenges() {
+      const challenges = await apiFetch('/api/admin/challenges');
+      document.getElementById('challenges-body').innerHTML = challenges.map(c => `
+        <tr>
+          <td>${c.id}</td>
+          <td>${escHtml(c.name)}</td>
+          <td>${escHtml(c.category)}</td>
+          <td>${c.points}</td>
+          <td><span class="tag">${escHtml(c.flag_type || 'exact')}</span></td>
+          <td><span class="tag">${escHtml(c.deploy_type)}</span></td>
+          <td>${c.is_visible ? '<span class="badge bg-success">Yes</span>' : '<span class="badge bg-secondary">No</span>'}</td>
+          <td>
+            <button class="btn btn-sm btn-secondary me-1" onclick='editChallenge(${JSON.stringify(c)})'>${t('admin.edit')}</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteChallenge(${c.id})">${t('admin.delete')}</button>
+          </td>
+        </tr>`).join('');
+    }
+
+    function openCreateChallenge() {
+      _currentChId = null;
+      document.getElementById('ch-modal-title').textContent = 'New Challenge';
+      document.getElementById('ch-form').reset();
+      document.getElementById('ch-id').value = '';
+      document.getElementById('ch-deploy-config').value = '{}';
+      document.getElementById('ch-visible').checked = true;
+      document.getElementById('ch-error').classList.add('d-none');
+      document.getElementById('flags-note').style.display = '';
+      document.getElementById('hints-note').style.display = '';
+      document.getElementById('files-note').style.display = '';
+      document.getElementById('flags-list').innerHTML = '';
+      document.getElementById('hints-list').innerHTML = '';
+      document.getElementById('files-list').innerHTML = '';
+      showChTab('basic', document.querySelector('#ch-tabs .nav-link'));
+      if (!chBsModal) chBsModal = new bootstrap.Modal(document.getElementById('ch-modal'));
+      chBsModal.show();
+    }
+
+    function editChallenge(c) {
+      _currentChId = c.id;
+      document.getElementById('ch-modal-title').textContent = 'Edit Challenge';
+      document.getElementById('ch-id').value          = c.id;
+      document.getElementById('ch-name').value         = c.name;
+      document.getElementById('ch-category').value     = c.category;
+      document.getElementById('ch-description').value  = c.description;
+      document.getElementById('ch-points').value       = c.points;
+      document.getElementById('ch-flag-type').value    = (c.flag_type === 'static') ? 'exact' : (c.flag_type || 'exact');
+      document.getElementById('ch-max-attempts').value = c.max_attempts || 0;
+      document.getElementById('ch-connection-info').value = c.connection_info || '';
+      document.getElementById('ch-deploy-type').value  = c.deploy_type;
+      document.getElementById('ch-deploy-backend').value = c.deploy_backend || '';
+      document.getElementById('ch-image').value        = c.image || '';
+      document.getElementById('ch-deploy-config').value = c.deploy_config || '{}';
+      document.getElementById('ch-visible').checked    = c.is_visible;
+      document.getElementById('ch-error').classList.add('d-none');
+      // hide new-challenge-only notes
+      document.getElementById('flags-note').style.display = 'none';
+      document.getElementById('hints-note').style.display = 'none';
+      document.getElementById('files-note').style.display = 'none';
+      showChTab('basic', document.querySelector('#ch-tabs .nav-link'));
+      if (!chBsModal) chBsModal = new bootstrap.Modal(document.getElementById('ch-modal'));
+      chBsModal.show();
+    }
+
+    async function saveChallengeForm(e) {
+      e.preventDefault();
+      const id = document.getElementById('ch-id').value;
+      const body = {
+        name:            document.getElementById('ch-name').value,
+        category:        document.getElementById('ch-category').value,
+        description:     document.getElementById('ch-description').value,
+        points:          parseInt(document.getElementById('ch-points').value),
+        flag_type:       document.getElementById('ch-flag-type').value,
+        max_attempts:    parseInt(document.getElementById('ch-max-attempts').value) || 0,
+        connection_info: document.getElementById('ch-connection-info').value,
+        deploy_type:     document.getElementById('ch-deploy-type').value,
+        deploy_backend:  document.getElementById('ch-deploy-backend').value,
+        image:           document.getElementById('ch-image').value,
+        deploy_config:   document.getElementById('ch-deploy-config').value,
+        is_visible:      document.getElementById('ch-visible').checked,
+      };
+      const errEl = document.getElementById('ch-error');
+      errEl.classList.add('d-none');
+      try {
+        let saved;
+        if (id) {
+          saved = await apiFetch('/api/admin/challenges/' + id, { method: 'PUT', body: JSON.stringify(body) });
+          _currentChId = id;
+        } else {
+          saved = await apiFetch('/api/admin/challenges', { method: 'POST', body: JSON.stringify(body) });
+          _currentChId = saved.id;
+          document.getElementById('ch-id').value = saved.id;
+          document.getElementById('flags-note').style.display = 'none';
+          document.getElementById('hints-note').style.display = 'none';
+          document.getElementById('files-note').style.display = 'none';
+        }
+        loadAdminChallenges();
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.classList.remove('d-none');
+      }
+    }
+
+    async function deleteChallenge(id) {
+      if (!confirm('Delete challenge ' + id + '?')) return;
+      await apiFetch('/api/admin/challenges/' + id, { method: 'DELETE' });
+      loadAdminChallenges();
+    }
+
+    // ── Flags ──
+    async function loadFlags(challengeId) {
+      const container = document.getElementById('flags-list');
+      try {
+        const flags = await apiFetch('/api/admin/challenges/' + challengeId + '/flags');
+        if (!flags || !flags.length) {
+          container.innerHTML = '<p class="text-muted small">No flags yet.</p>';
+          return;
+        }
+        container.innerHTML = flags.map(f => `
+          <div class="hint-item d-flex justify-content-between align-items-center">
+            <div><code style="color:var(--ctf-text)">${escHtml(f.content)}</code> <span class="tag ms-2">${escHtml(f.type)}</span></div>
+            <button type="button" class="btn btn-sm btn-danger" onclick="deleteFlag(${parseInt(challengeId)},${parseInt(f.id)})">✕</button>
+          </div>`).join('');
+      } catch (err) {
+        container.innerHTML = `<div class="text-danger small">${escHtml(err.message)}</div>`;
+      }
+    }
+
+    async function addFlag() {
+      if (!_currentChId) { alert('Save the challenge first.'); return; }
+      const content = document.getElementById('new-flag-content').value.trim();
+      const type    = document.getElementById('new-flag-type').value;
+      if (!content) return;
+      try {
+        await apiFetch('/api/admin/challenges/' + _currentChId + '/flags', {
+          method: 'POST', body: JSON.stringify({ content, type }),
+        });
+        document.getElementById('new-flag-content').value = '';
+        loadFlags(_currentChId);
+      } catch (err) { alert(err.message); }
+    }
+
+    async function deleteFlag(cid, fid) {
+      if (!confirm('Delete this flag?')) return;
+      await apiFetch('/api/admin/challenges/' + cid + '/flags/' + fid, { method: 'DELETE' });
+      loadFlags(cid);
+    }
+
+    // ── Hints ──
+    async function loadHints(challengeId) {
+      const container = document.getElementById('hints-list');
+      try {
+        const hints = await apiFetch('/api/admin/challenges/' + challengeId + '/hints');
+        if (!hints || !hints.length) {
+          container.innerHTML = '<p class="text-muted small">No hints yet.</p>';
+          return;
+        }
+        container.innerHTML = hints.map(h => `
+          <div class="hint-item d-flex justify-content-between align-items-center">
+            <div>
+              <span class="hint-cost">${parseInt(h.cost) > 0 ? parseInt(h.cost) + ' pts' : 'Free'}</span>
+              <span class="ms-2">${escHtml(h.content)}</span>
+            </div>
+            <button type="button" class="btn btn-sm btn-danger" onclick="deleteHint(${parseInt(challengeId)},${parseInt(h.id)})">✕</button>
+          </div>`).join('');
+      } catch (err) {
+        container.innerHTML = `<div class="text-danger small">${escHtml(err.message)}</div>`;
+      }
+    }
+
+    async function addHint() {
+      if (!_currentChId) { alert('Save the challenge first.'); return; }
+      const content = document.getElementById('new-hint-content').value.trim();
+      const cost    = parseInt(document.getElementById('new-hint-cost').value) || 0;
+      if (!content) return;
+      try {
+        await apiFetch('/api/admin/challenges/' + _currentChId + '/hints', {
+          method: 'POST', body: JSON.stringify({ content, cost }),
+        });
+        document.getElementById('new-hint-content').value = '';
+        document.getElementById('new-hint-cost').value = '0';
+        loadHints(_currentChId);
+      } catch (err) { alert(err.message); }
+    }
+
+    async function deleteHint(cid, hid) {
+      if (!confirm('Delete this hint?')) return;
+      await apiFetch('/api/admin/challenges/' + cid + '/hints/' + hid, { method: 'DELETE' });
+      loadHints(cid);
+    }
+
+    // ── Files ──
+    async function loadAdminFiles(challengeId) {
+      const container = document.getElementById('files-list');
+      try {
+        const files = await apiFetch('/api/admin/challenges/' + challengeId + '/files');
+        if (!files || !files.length) {
+          container.innerHTML = '<p class="text-muted small">No files yet.</p>';
+          return;
+        }
+        container.innerHTML = files.map(f => `
+          <div class="file-item">
+            <span class="file-icon">📄</span>
+            <a href="${escHtml(f.url || f.path || '')}" target="_blank">${escHtml(f.name || f.filename || f.url || '')}</a>
+            <button type="button" class="btn btn-sm btn-danger ms-auto" onclick="deleteFile(${parseInt(challengeId)},${parseInt(f.id)})">✕</button>
+          </div>`).join('');
+      } catch (err) {
+        container.innerHTML = `<div class="text-danger small">${escHtml(err.message)}</div>`;
+      }
+    }
+
+    async function uploadFiles() {
+      if (!_currentChId) { alert('Save the challenge first.'); return; }
+      const input = document.getElementById('file-upload');
+      if (!input.files.length) return;
+      const formData = new FormData();
+      for (const file of input.files) formData.append('file', file);
+      try {
+        await fetch('/api/admin/challenges/' + _currentChId + '/files', {
+          method: 'POST', body: formData, credentials: 'same-origin',
+        });
+        input.value = '';
+        loadAdminFiles(_currentChId);
+      } catch (err) { alert(err.message); }
+    }
+
+    async function deleteFile(cid, fid) {
+      if (!confirm('Delete this file?')) return;
+      await apiFetch('/api/admin/challenges/' + cid + '/files/' + fid, { method: 'DELETE' });
+      loadAdminFiles(cid);
+    }
+
+    // ══════════════════════════════════════
+    // USERS
+    // ══════════════════════════════════════
+    async function loadAdminUsers() {
+      const users = await apiFetch('/api/admin/users');
+      document.getElementById('users-body').innerHTML = users.map(u => `
+        <tr>
+          <td>${u.id}</td>
+          <td><a href="/admin/users/${u.id}" style="color:var(--ctf-accent)">${escHtml(u.username)}</a></td>
+          <td>${escHtml(u.email)}</td>
+          <td>
+            <select class="form-select form-select-sm" onchange="updateUserRole(${u.id}, this.value, ${u.score})">
+              <option${u.role==='user'?' selected':''} value="user">user</option>
+              <option${u.role==='admin'?' selected':''} value="admin">admin</option>
+            </select>
+          </td>
+          <td>${u.score}</td>
+          <td>${u.verified ? '<span class="badge bg-success">✓</span>' : '<span class="badge bg-secondary">–</span>'}</td>
+          <td>${u.hidden ? '<span class="badge bg-warning text-dark">Hidden</span>' : '<span class="badge bg-secondary">–</span>'}</td>
+          <td>${u.banned ? '<span class="badge bg-danger">Banned</span>' : '<span class="badge bg-success">Active</span>'}</td>
+          <td class="d-flex gap-1 flex-wrap">
+            ${u.banned
+              ? `<button class="btn btn-sm btn-success" onclick="setBanned(${u.id}, false)">${t('admin.unban')}</button>`
+              : `<button class="btn btn-sm btn-warning" onclick="setBanned(${u.id}, true)">${t('admin.ban')}</button>`}
+            <button class="btn btn-sm btn-outline-secondary" onclick="resetScore(${u.id})">${t('admin.reset_score')}</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id})">${t('admin.delete_user')}</button>
+          </td>
+        </tr>`).join('');
+    }
+
+    async function updateUserRole(id, role, score) {
+      await apiFetch('/api/admin/users/' + id, { method: 'PUT', body: JSON.stringify({ role, score }) });
+    }
+
+    async function setBanned(id, banned) {
+      await apiFetch('/api/admin/users/' + id, { method: 'PUT', body: JSON.stringify({ banned }) });
+      loadAdminUsers();
+    }
+
+    async function resetScore(id) {
+      if (!confirm('Reset this user\'s score and delete all their submissions?')) return;
+      await apiFetch('/api/admin/users/' + id + '/reset_score', { method: 'POST' });
+      loadAdminUsers();
+    }
+
+    async function deleteUser(id) {
+      if (!confirm('Permanently delete this user?')) return;
+      await apiFetch('/api/admin/users/' + id, { method: 'DELETE' });
+      loadAdminUsers();
+    }
+
+    // ══════════════════════════════════════
+    // NOTIFICATIONS
+    // ══════════════════════════════════════
+    async function loadAdminNotifications() {
+      const container = document.getElementById('notif-list-container');
+      try {
+        const notifs = await apiFetch('/api/notifications');
+        if (!notifs || !notifs.length) {
+          container.innerHTML = '<p class="text-muted text-center py-4" data-i18n="notifications.empty">No notifications yet.</p>';
+          return;
+        }
+        const sorted = [...notifs].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        container.innerHTML = sorted.map(n => `
+          <div class="notification-card d-flex justify-content-between align-items-start">
+            <div>
+              <div class="notif-title">${escHtml(n.title)}</div>
+              <div class="notif-date">${new Date(n.created_at).toLocaleString()}</div>
+              <div class="notif-content">${escHtml(n.content)}</div>
+            </div>
+            <button class="btn btn-sm btn-danger ms-3" onclick="deleteNotification(${n.id})">✕</button>
+          </div>`).join('');
+      } catch (err) {
+        container.innerHTML = `<div class="alert alert-danger">${escHtml(err.message)}</div>`;
+      }
+    }
+
+    async function createNotification() {
+      const title   = document.getElementById('notif-title').value.trim();
+      const content = document.getElementById('notif-content').value.trim();
+      if (!title || !content) { alert('Title and content are required.'); return; }
+      try {
+        await apiFetch('/api/admin/notifications', { method: 'POST', body: JSON.stringify({ title, content }) });
+        document.getElementById('notif-title').value   = '';
+        document.getElementById('notif-content').value = '';
+        loadAdminNotifications();
+      } catch (err) { alert(err.message); }
+    }
+
+    async function deleteNotification(id) {
+      if (!confirm('Delete this notification?')) return;
+      await apiFetch('/api/admin/notifications/' + id, { method: 'DELETE' });
+      loadAdminNotifications();
+    }
+
+    // ══════════════════════════════════════
+    // PAGES
+    // ══════════════════════════════════════
+    async function loadAdminPages() {
+      const container = document.getElementById('pages-list-container');
+      try {
+        const pages = await apiFetch('/api/admin/pages');
+        if (!pages || !pages.length) {
+          container.innerHTML = '<p class="text-muted text-center py-4">No pages yet.</p>';
+          return;
+        }
+        container.innerHTML = pages.map(p => `
+          <div class="card p-3 mb-2 d-flex flex-row justify-content-between align-items-center">
+            <div>
+              <strong>${escHtml(p.title)}</strong>
+              <span class="text-muted ms-2 small">/${escHtml(p.slug)}</span>
+              ${p.draft ? '<span class="badge bg-warning text-dark ms-2">Draft</span>' : ''}
+            </div>
+            <div class="d-flex gap-1">
+              <button class="btn btn-sm btn-secondary" onclick='editPage(${JSON.stringify(p)})'>${t('pages.edit')}</button>
+              <button class="btn btn-sm btn-danger" onclick="deletePage(${p.id})">${t('pages.delete')}</button>
+            </div>
+          </div>`).join('');
+      } catch (err) {
+        container.innerHTML = `<div class="alert alert-danger">${escHtml(err.message)}</div>`;
+      }
+    }
+
+    function editPage(p) {
+      document.getElementById('page-form-title').textContent = t('pages.edit');
+      document.getElementById('page-id').value      = p.id;
+      document.getElementById('page-title').value   = p.title;
+      document.getElementById('page-slug').value    = p.slug;
+      document.getElementById('page-content').value = p.content;
+      document.getElementById('page-draft').checked = p.draft || false;
+    }
+
+    function resetPageForm() {
+      document.getElementById('page-form-title').textContent = t('pages.new');
+      document.getElementById('page-id').value      = '';
+      document.getElementById('page-title').value   = '';
+      document.getElementById('page-slug').value    = '';
+      document.getElementById('page-content').value = '';
+      document.getElementById('page-draft').checked = false;
+    }
+
+    async function savePage() {
+      const id      = document.getElementById('page-id').value;
+      const body = {
+        title:   document.getElementById('page-title').value,
+        slug:    document.getElementById('page-slug').value,
+        content: document.getElementById('page-content').value,
+        draft:   document.getElementById('page-draft').checked,
+      };
+      try {
+        if (id) {
+          await apiFetch('/api/admin/pages/' + id, { method: 'PUT', body: JSON.stringify(body) });
+        } else {
+          await apiFetch('/api/admin/pages', { method: 'POST', body: JSON.stringify(body) });
+        }
+        resetPageForm();
+        loadAdminPages();
+      } catch (err) { alert(err.message); }
+    }
+
+    async function deletePage(id) {
+      if (!confirm('Delete this page?')) return;
+      await apiFetch('/api/admin/pages/' + id, { method: 'DELETE' });
+      loadAdminPages();
+    }
+
+    // ══════════════════════════════════════
+    // CONFIG
+    // ══════════════════════════════════════
+    const settingsFieldMap = {
+      themeMeta: [
+        { id: 'cfg-theme-name', key: 'ctf_theme', kind: 'string' },
+        { id: 'cfg-theme-header', key: 'theme_header', kind: 'string' },
+        { id: 'cfg-theme-footer', key: 'theme_footer', kind: 'string' },
+        { id: 'cfg-theme-settings', key: 'theme_settings', kind: 'string' },
+      ],
+      accounts: [
+        { id: 'cfg-accounts-domain-whitelist', key: 'domain_whitelist', kind: 'string' },
+        { id: 'cfg-accounts-verify-emails', key: 'verify_emails', kind: 'boolSelect' },
+        { id: 'cfg-accounts-team-creation', key: 'team_creation', kind: 'boolSelect' },
+        { id: 'cfg-accounts-max-team-size', key: 'team_size', kind: 'int' },
+        { id: 'cfg-accounts-num-teams', key: 'num_teams', kind: 'int' },
+        { id: 'cfg-accounts-num-users', key: 'num_users', kind: 'int' },
+        { id: 'cfg-accounts-team-disbanding', key: 'team_disbanding', kind: 'string' },
+        { id: 'cfg-accounts-incorrect-submissions-per-min', key: 'incorrect_submissions_per_min', kind: 'int' },
+        { id: 'cfg-accounts-name-changes', key: 'name_changes', kind: 'boolSelect' },
+      ],
+      pages: [
+        { id: 'cfg-pages-robots-txt', key: 'robots_txt', kind: 'string' },
+      ],
+      brackets: [
+        { id: 'cfg-brackets-enabled', key: 'brackets_enabled', kind: 'bool' },
+        { id: 'cfg-brackets-type', key: 'brackets_type', kind: 'string' },
+      ],
+      customfields: [
+        { id: 'cfg-customfields-enabled', key: 'customfields_enabled', kind: 'bool' },
+        { id: 'cfg-customfields-required', key: 'customfields_required', kind: 'bool' },
+      ],
+      mlc: [
+        { id: 'cfg-mlc-client-id', key: 'oauth_client_id', kind: 'string' },
+        { id: 'cfg-mlc-client-secret', key: 'oauth_client_secret', kind: 'string' },
+      ],
+      settings: [
+        { id: 'cfg-settings-ctf-start', key: 'settings_ctf_start', kind: 'string' },
+        { id: 'cfg-settings-ctf-end', key: 'settings_ctf_end', kind: 'string' },
+        { id: 'cfg-settings-challenge-visibility', key: 'settings_challenge_visibility', kind: 'string' },
+        { id: 'cfg-settings-account-visibility', key: 'account_visibility', kind: 'string' },
+        { id: 'cfg-settings-score-visibility', key: 'score_visibility', kind: 'string' },
+        { id: 'cfg-settings-registration-visibility', key: 'registration_visibility', kind: 'string' },
+        { id: 'cfg-settings-paused', key: 'paused', kind: 'bool' },
+      ],
+      security: [
+        { id: 'cfg-security-html-sanitization', key: 'html_sanitization', kind: 'boolSelect' },
+        { id: 'cfg-security-registration-code', key: 'registration_code', kind: 'string' },
+      ],
+      email: [
+        { id: 'cfg-email-successful-registration-subject', key: 'successful_registration_email_subject', kind: 'string' },
+        { id: 'cfg-email-successful-registration-body', key: 'successful_registration_email_body', kind: 'string' },
+        { id: 'cfg-email-verification-subject', key: 'verification_email_subject', kind: 'string' },
+        { id: 'cfg-email-verification-body', key: 'verification_email_body', kind: 'string' },
+        { id: 'cfg-email-from-address', key: 'mailfrom_addr', kind: 'string' },
+        { id: 'cfg-email-smtp-host', key: 'mail_server', kind: 'string' },
+        { id: 'cfg-email-smtp-port', key: 'mail_port', kind: 'int' },
+        { id: 'cfg-email-smtp-user', key: 'mail_username', kind: 'string' },
+        { id: 'cfg-email-smtp-pass', key: 'mail_password', kind: 'string' },
+        { id: 'cfg-email-mail-useauth', key: 'mail_useauth', kind: 'bool' },
+        { id: 'cfg-email-mail-ssl', key: 'mail_ssl', kind: 'bool' },
+        { id: 'cfg-email-mail-tls', key: 'mail_tls', kind: 'bool' },
+      ],
+      time: [
+        { id: 'cfg-time-start-ts', key: 'start', kind: 'int' },
+        { id: 'cfg-time-end-ts', key: 'end', kind: 'int' },
+        { id: 'cfg-time-timezone', key: 'time_timezone', kind: 'string' },
+        { id: 'cfg-time-freeze-ts', key: 'freeze', kind: 'int' },
+        { id: 'cfg-time-view-after-ctf', key: 'view_after_ctf', kind: 'bool' },
+      ],
+      social: [
+        { id: 'cfg-social-shares', key: 'social_shares', kind: 'boolSelect' },
+        { id: 'cfg-social-discord', key: 'social_discord', kind: 'string' },
+        { id: 'cfg-social-twitter', key: 'social_twitter', kind: 'string' },
+        { id: 'cfg-social-website', key: 'social_website', kind: 'string' },
+      ],
+      legal: [
+        { id: 'cfg-legal-terms-url', key: 'legal_terms_url', kind: 'string' },
+        { id: 'cfg-legal-terms-text', key: 'tos_text', kind: 'string' },
+        { id: 'cfg-legal-privacy-url', key: 'legal_privacy_url', kind: 'string' },
+        { id: 'cfg-legal-privacy-text', key: 'privacy_text', kind: 'string' },
+        { id: 'cfg-legal-rules-url', key: 'legal_rules_url', kind: 'string' },
+      ],
+      backup: [
+        { id: 'cfg-backup-enabled', key: 'backup_enabled', kind: 'bool' },
+        { id: 'cfg-backup-schedule', key: 'backup_schedule', kind: 'string' },
+        { id: 'cfg-backup-retention-days', key: 'backup_retention_days', kind: 'int' },
+      ],
+      usermode: [
+        { id: 'cfg-usermode-teams', key: 'user_mode', kind: 'radioUserMode' },
+        { id: 'cfg-usermode-allow-switch', key: 'usermode_allow_switch', kind: 'bool' },
+      ],
+      reset: [
+        { id: 'cfg-reset-preserve-users', key: 'reset_preserve_users', kind: 'bool' },
+        { id: 'cfg-reset-preserve-teams', key: 'reset_preserve_teams', kind: 'bool' },
+      ],
+    };
+
+    function applyConfigField(id, kind, value) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (kind === 'radioUserMode') {
+        const mode = (value || 'users').toString();
+        const teams = document.getElementById('cfg-usermode-teams');
+        const users = document.getElementById('cfg-usermode-users');
+        if (teams && users) {
+          teams.checked = mode === 'teams';
+          users.checked = mode !== 'teams';
+        }
+        return;
+      }
+      if (kind === 'boolSelect') {
+        el.value = String(!!value);
+        return;
+      }
+      if (kind === 'bool') {
+        el.checked = !!value;
+        return;
+      }
+      el.value = value == null ? '' : String(value);
+    }
+
+    function collectConfigField(id, kind) {
+      const el = document.getElementById(id);
+      if (!el) return null;
+      if (kind === 'radioUserMode') {
+        const teams = document.getElementById('cfg-usermode-teams');
+        return teams && teams.checked ? 'teams' : 'users';
+      }
+      if (kind === 'boolSelect') return el.value === 'true';
+      if (kind === 'bool') return !!el.checked;
+      if (kind === 'int') {
+        const n = parseInt(el.value, 10);
+        return Number.isFinite(n) ? n : 0;
+      }
+      return el.value || '';
+    }
+
+    function setSectionMessage(section, ok, message) {
+      const errEl = document.getElementById('settings-' + section + '-error');
+      const okEl = document.getElementById('settings-' + section + '-success');
+      if (!errEl || !okEl) return;
+      errEl.classList.add('d-none');
+      okEl.classList.add('d-none');
+      if (ok) {
+        okEl.textContent = message;
+        okEl.classList.remove('d-none');
+      } else {
+        errEl.textContent = message;
+        errEl.classList.remove('d-none');
+      }
+    }
+
+    async function loadAdminConfig() {
+      try {
+        const [cfg, theme] = await Promise.all([
+          apiFetch('/api/admin/config').catch(() => ({})),
+          apiFetch('/api/theme').catch(() => ({})),
+        ]);
+        document.getElementById('cfg-name').value        = cfg.ctf_name       || '';
+        document.getElementById('cfg-description').value = cfg.ctf_description || cfg.description || '';
+        document.getElementById('cfg-reg-open').checked  = !!cfg.registration_open;
+        document.getElementById('cfg-team-mode').checked = !!cfg.team_mode;
+        const teams = document.getElementById('cfg-usermode-teams');
+        const users = document.getElementById('cfg-usermode-users');
+        if (teams && users) {
+          teams.checked = String(cfg.user_mode || 'users') === 'teams';
+          users.checked = !teams.checked;
+        }
+        const normalizedTheme = (!theme || typeof theme !== 'object')
+          ? { name: 'default', vars: {} }
+          : ((theme.vars || theme.name || theme.custom_css || theme.custom_js)
+            ? theme
+            : { name: 'default', vars: theme });
+        document.getElementById('theme-vars').value      = JSON.stringify(normalizedTheme, null, 2);
+
+        Object.values(settingsFieldMap).flat().forEach(f => {
+          applyConfigField(f.id, f.kind, cfg[f.key]);
+        });
+      } catch (err) {
+        console.error('Config load error:', err);
+      }
+    }
+
+    async function saveConfig() {
+      const errEl = document.getElementById('cfg-error');
+      const okEl  = document.getElementById('cfg-success');
+      errEl.classList.add('d-none');
+      okEl.classList.add('d-none');
+      const body = {
+        ctf_name:          document.getElementById('cfg-name').value,
+        ctf_description:   document.getElementById('cfg-description').value,
+        registration_open: document.getElementById('cfg-reg-open').checked,
+        team_mode:         document.getElementById('cfg-team-mode').checked,
+      };
+      try {
+        await apiFetch('/api/admin/config', { method: 'PUT', body: JSON.stringify(body) });
+        okEl.textContent = 'Config saved!';
+        okEl.classList.remove('d-none');
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.classList.remove('d-none');
+      }
+    }
+
+    async function saveTheme() {
+      const errEl = document.getElementById('theme-error');
+      const okEl  = document.getElementById('theme-success');
+      errEl.classList.add('d-none');
+      okEl.classList.add('d-none');
+      let theme;
+      try {
+        theme = JSON.parse(document.getElementById('theme-vars').value);
+      } catch (_) {
+        errEl.textContent = 'Invalid JSON';
+        errEl.classList.remove('d-none');
+        return;
+      }
+
+      if (!theme || typeof theme !== 'object') {
+        errEl.textContent = 'Theme must be a JSON object';
+        errEl.classList.remove('d-none');
+        return;
+      }
+
+      const payload = (theme.vars || theme.name || theme.custom_css || theme.custom_js)
+        ? theme
+        : { name: 'default', vars: theme };
+
+      try {
+        await apiFetch('/api/admin/theme', { method: 'PUT', body: JSON.stringify(payload) });
+        okEl.textContent = 'Theme saved!';
+        okEl.classList.remove('d-none');
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.classList.remove('d-none');
+      }
+    }
+
+    async function saveSettingsSection(section) {
+      const defs = settingsFieldMap[section] || [];
+      if (!defs.length) return;
+      const body = {};
+      defs.forEach(def => {
+        body[def.key] = collectConfigField(def.id, def.kind);
+      });
+      setSectionMessage(section, true, 'Saving...');
+      try {
+        await apiFetch('/api/admin/config', { method: 'PUT', body: JSON.stringify(body) });
+        setSectionMessage(section, true, 'Settings saved!');
+      } catch (err) {
+        setSectionMessage(section, false, err.message || 'Save failed');
+      }
+    }
+
+    // ══════════════════════════════════════
+    // INIT
+    // ══════════════════════════════════════
+    (async () => {
+      await initI18n();
+      await loadPluginOptions();
+      const user = await getMe();
+      if (!user || user.role !== 'admin') { location.href = '/'; return; }
+      loadAdminChallenges();
+    })();
+  </script>
+</body>
+</html>
+<!--
+  NOTE: The following routes need to be registered in the Go router:
+    GET  /notifications       → frontend/notifications.html
+    GET  /statistics          → frontend/statistics.html
+    GET  /page                → frontend/page.html  (with ?slug=xxx)
+    GET  /admin/users/:id     → frontend/admin-user.html
+-->
+

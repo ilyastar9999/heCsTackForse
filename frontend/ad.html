@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attack &amp; Defence – heCsTackForse</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    .status-up     { color: #28a745; }
+    .status-down   { color: #dc3545; }
+    .status-corrupt{ color: #ffc107; }
+    .sploit-form textarea { font-family: 'Courier New', monospace; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg sticky-top">
+    <div class="container-fluid px-4">
+      <a class="navbar-brand" href="/">heCsTackForse</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navMenu">
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item"><a class="nav-link" href="/challenges">Challenges</a></li>
+          <li class="nav-item"><a class="nav-link" href="/scoreboard">Scoreboard</a></li>
+          <li class="nav-item"><a class="nav-link active" href="/ad">A&amp;D</a></li>
+        </ul>
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item"><a class="nav-link" href="/profile" id="nav-profile">Profile</a></li>
+          <li class="nav-item" id="nav-login-li"><a class="nav-link" href="/login">Login</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="page-container">
+    <h1 class="page-title">⚔️ Attack &amp; Defence</h1>
+
+    <!-- Status row -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-4">
+        <div class="round-card">
+          <div class="text-muted small mb-1" style="text-transform:uppercase;letter-spacing:.08em">Current Round</div>
+          <div class="round-number" id="round-num">—</div>
+          <div class="text-muted small mt-1">Next round in</div>
+          <div class="round-timer" id="round-timer">—</div>
+        </div>
+      </div>
+      <div class="col-md-8">
+        <div class="card p-3 h-100">
+          <h6 style="color:var(--ctf-accent);text-transform:uppercase;font-size:.75rem;letter-spacing:.06em">🔒 VPN Access</h6>
+          <p class="text-muted small mb-2">Connect to the game network via WireGuard VPN to access team service instances at their assigned IPs.</p>
+          <button class="btn btn-secondary btn-sm" id="btn-vpn-download" onclick="downloadVPN()">⬇ Download WireGuard Config</button>
+          <div id="vpn-msg" class="mt-2 small"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <ul class="nav nav-tabs mb-4">
+      <li class="nav-item"><a class="nav-link active" href="#" onclick="switchTab('services',this)">🖥 Services</a></li>
+      <li class="nav-item"><a class="nav-link" href="#" onclick="switchTab('scoreboard',this)">🏆 Scoreboard</a></li>
+      <li class="nav-item"><a class="nav-link" href="#" onclick="switchTab('sploits',this)">💀 Sploits</a></li>
+      <li class="nav-item"><a class="nav-link" href="#" onclick="switchTab('submit',this)">🚩 Submit Flags</a></li>
+    </ul>
+
+    <!-- SERVICES TAB -->
+    <div id="tab-services">
+      <h5 class="mb-2">Service Status</h5>
+      <p class="text-muted small">Checker results from the latest round. ✅ = up, ❌ = down, ⚠️ = corrupted.</p>
+      <div class="card p-3" id="services-container">
+        <div class="text-muted">Loading…</div>
+      </div>
+    </div>
+
+    <!-- SCOREBOARD TAB -->
+    <div id="tab-scoreboard" style="display:none">
+      <h5 class="mb-2">A&amp;D Scoreboard</h5>
+      <p class="text-muted small">Attack points = flags captured. Defence points = rounds your services stayed up.</p>
+      <div class="card p-0" id="ad-scoreboard-container">
+        <div class="p-3 text-muted">Loading…</div>
+      </div>
+    </div>
+
+    <!-- SPLOITS TAB -->
+    <div id="tab-sploits" style="display:none">
+      <h5 class="mb-3">My Sploits</h5>
+      <p class="text-muted small mb-3">Upload exploit scripts that run against every other team's service each round. Captured <code>FLAG{…}</code> patterns from stdout are submitted automatically. Script receives <code>HOST</code> and <code>PORT</code> env vars.</p>
+
+      <div class="card p-3 mb-4">
+        <h6 style="color:var(--ctf-accent)">Upload New Sploit</h6>
+        <div class="row g-2 mb-3">
+          <div class="col-md-4">
+            <label class="form-label">Name</label>
+            <input class="form-control" id="sploit-name" placeholder="My exploit">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Language</label>
+            <select class="form-select" id="sploit-lang">
+              <option value="python3">Python 3</option>
+              <option value="bash">Bash</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Challenge ID (0 = all)</label>
+            <input class="form-control" id="sploit-challenge" type="number" placeholder="0">
+          </div>
+        </div>
+        <label class="form-label">Script</label>
+        <textarea class="form-control mb-3" id="sploit-script" rows="8" placeholder="#!/usr/bin/env python3
+import socket, os
+HOST = os.environ.get('HOST', '10.10.1.1')
+PORT = int(os.environ.get('PORT', '9999'))
+s = socket.socket()
+s.connect((HOST, PORT))
+print(s.recv(1024).decode())  # FLAG{...} extracted automatically"></textarea>
+        <div class="d-flex align-items-center gap-3">
+          <button class="btn btn-primary btn-sm" onclick="uploadSploit()">⬆ Upload Sploit</button>
+          <span id="sploit-upload-msg" class="small"></span>
+        </div>
+      </div>
+
+      <div id="sploit-list-container">
+        <div class="text-muted">Loading…</div>
+      </div>
+    </div>
+
+    <!-- SUBMIT FLAGS TAB -->
+    <div id="tab-submit" style="display:none">
+      <h5 class="mb-2">Submit Captured Flags</h5>
+      <p class="text-muted small mb-3">Flags captured manually (e.g. running your exploit locally over VPN) are proxied to the central flag submitter at <code id="flag-submit-url-display">—</code>.</p>
+      <div class="card p-3">
+        <label class="form-label">Flags (one per line)</label>
+        <textarea class="form-control mb-3" id="manual-flags" rows="5" placeholder="FLAG{abc123...}&#10;FLAG{def456...}"></textarea>
+        <div class="d-flex align-items-center gap-3">
+          <button class="btn btn-primary btn-sm" onclick="submitManualFlags()">🚩 Submit Flags</button>
+          <span id="manual-submit-msg" class="small"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/static/js/api.js"></script>
+  <script>
+    // Auth guard
+    (async () => {
+      const user = await api.me();
+      if (!user) { window.location.href = '/login'; return; }
+      document.getElementById('nav-profile').textContent = `Profile (${user.username})`;
+      document.getElementById('nav-login-li').style.display = 'none';
+    })();
+
+    // Tab switching
+    function switchTab(name, el) {
+      document.querySelectorAll('[id^="tab-"]').forEach(t => t.style.display = 'none');
+      document.querySelectorAll('.nav-tabs .nav-link').forEach(l => l.classList.remove('active'));
+      document.getElementById('tab-' + name).style.display = '';
+      el.classList.add('active');
+    }
+
+    // Round status
+    let roundDurSec = 300, nextRoundAt = null;
+
+    async function loadStatus() {
+      const data = await api.get('/api/ad/status');
+      if (!data) return;
+      document.getElementById('round-num').textContent = data.round;
+      if (data.round_duration) {
+        roundDurSec = parseDuration(data.round_duration);
+        nextRoundAt = Date.now() + roundDurSec * 1000;
+      }
+      const urlEl = document.getElementById('flag-submit-url-display');
+      if (urlEl) urlEl.textContent = data.flag_submit_url || '(not configured)';
+      if (!data.vpn_enabled) {
+        document.getElementById('btn-vpn-download').disabled = true;
+        document.getElementById('vpn-msg').textContent = 'VPN not configured on this server.';
+      }
+    }
+
+    function parseDuration(s) {
+      const m = s.match(/^(\d+(?:\.\d+)?)(ms|s|m|h)$/);
+      if (!m) return 300;
+      const n = parseFloat(m[1]);
+      return { ms: n/1000, s: n, m: n*60, h: n*3600 }[m[2]] || 300;
+    }
+
+    function tickTimer() {
+      if (!nextRoundAt) return;
+      const rem = Math.max(0, Math.floor((nextRoundAt - Date.now()) / 1000));
+      document.getElementById('round-timer').textContent =
+        String(Math.floor(rem/60)).padStart(2,'0') + ':' + String(rem%60).padStart(2,'0');
+      if (rem === 0) { nextRoundAt = Date.now() + roundDurSec*1000; loadStatus(); loadServices(); loadAdScoreboard(); }
+    }
+    setInterval(tickTimer, 1000);
+
+    // Services
+    async function loadServices() {
+      const rows = await api.get('/api/ad/services') || [];
+      const el = document.getElementById('services-container');
+      if (!rows.length) { el.innerHTML = '<p class="text-muted small">No service data yet.</p>'; return; }
+      const byChal = {}, teamSet = new Set();
+      rows.forEach(r => { (byChal[r.challenge_id] = byChal[r.challenge_id]||{})[r.team_id] = r; teamSet.add(r.team_id); });
+      const teams = [...teamSet].sort((a,b)=>a-b);
+      let html = '<table class="admin-table"><thead><tr><th>Challenge</th>' + teams.map(t=>`<th>Team ${t}</th>`).join('') + '</tr></thead><tbody>';
+      Object.entries(byChal).forEach(([cid, tm]) => {
+        html += `<tr><td><strong>#${cid}</strong></td>` + teams.map(t => {
+          const s = tm[t]; if (!s) return '<td>—</td>';
+          const cls = 'status-' + s.status;
+          const icon = s.status==='up'?'✅':s.status==='down'?'❌':'⚠️';
+          return `<td class="${cls}">${icon} ${s.status}</td>`;
+        }).join('') + '</tr>';
+      });
+      el.innerHTML = html + '</tbody></table>';
+    }
+
+    // AD Scoreboard
+    async function loadAdScoreboard() {
+      const rows = await api.get('/api/ad/scoreboard') || [];
+      const el = document.getElementById('ad-scoreboard-container');
+      if (!rows.length) { el.innerHTML = '<p class="text-muted p-3 small">No teams yet.</p>'; return; }
+      let html = '<table class="scoreboard-table"><thead><tr><th>#</th><th>Team</th><th>⚔ Attack</th><th>🛡 Defence</th><th>Total</th></tr></thead><tbody>';
+      rows.forEach((r,i) => {
+        const cls = i===0?' class="rank-gold"':i===1?' class="rank-silver"':i===2?' class="rank-bronze"':'';
+        html += `<tr${cls}><td>${i+1}</td><td>${esc(r.team_name)}</td><td>${r.attack_pts}</td><td>${r.defence_pts}</td><td><strong>${r.total}</strong></td></tr>`;
+      });
+      el.innerHTML = html + '</tbody></table>';
+    }
+
+    // Sploits
+    async function loadSploits() {
+      const sploits = await api.get('/api/ad/sploits') || [];
+      const el = document.getElementById('sploit-list-container');
+      if (!sploits.length) { el.innerHTML = '<p class="text-muted small">No sploits uploaded yet.</p>'; return; }
+      el.innerHTML = '<div class="d-flex flex-column gap-2">' + sploits.map(sp => `
+        <div class="card p-3">
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div>
+              <strong>${esc(sp.name)}</strong>
+              <span class="tag ms-2" style="${sp.enabled?'color:var(--ctf-green);border-color:rgba(40,167,69,.3)':'color:var(--ctf-red);border-color:rgba(220,53,69,.3)'}">${sp.enabled?'ENABLED':'DISABLED'}</span>
+              <div class="text-muted small mt-1">Language: ${esc(sp.language)} · Challenge: ${sp.challenge_id||'all'} · Last run: ${sp.last_run_at?new Date(sp.last_run_at).toLocaleString():'never'}</div>
+            </div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-sm btn-secondary" onclick="viewResults(${sp.id})">Results</button>
+              <button class="btn btn-sm btn-secondary" onclick="toggleSploit(${sp.id},${!sp.enabled})">${sp.enabled?'Disable':'Enable'}</button>
+              <button class="btn btn-sm btn-danger" onclick="deleteSploit(${sp.id})">Delete</button>
+            </div>
+          </div>
+        </div>`).join('') + '</div>';
+    }
+
+    async function uploadSploit() {
+      const name = document.getElementById('sploit-name').value.trim();
+      const lang = document.getElementById('sploit-lang').value;
+      const script = document.getElementById('sploit-script').value;
+      const chalID = parseInt(document.getElementById('sploit-challenge').value)||0;
+      const msg = document.getElementById('sploit-upload-msg');
+      if (!name||!script) { msg.textContent='Name and script required.'; msg.style.color='var(--ctf-red)'; return; }
+      const res = await api.post('/api/ad/sploits', {name, language:lang, script, challenge_id:chalID});
+      if (res&&res.id) {
+        msg.textContent='✅ Sploit #'+res.id+' uploaded!'; msg.style.color='var(--ctf-green)';
+        document.getElementById('sploit-name').value=''; document.getElementById('sploit-script').value='';
+        loadSploits();
+      } else { msg.textContent='❌ '+(res&&res.error||'Upload failed'); msg.style.color='var(--ctf-red)'; }
+    }
+
+    async function toggleSploit(id, enabled) { await api.put('/api/ad/sploits/'+id,{enabled}); loadSploits(); }
+    async function deleteSploit(id) { if(!confirm('Delete this sploit?'))return; await api.del('/api/ad/sploits/'+id); loadSploits(); }
+    async function viewResults(id) {
+      const results = await api.get('/api/ad/sploits/'+id+'/results')||[];
+      if(!results.length){alert('No results yet.');return;}
+      let text=`Sploit #${id} results:\n\n`;
+      results.slice(0,20).forEach(r=>{
+        text+=`Round ${r.round} → Team ${r.target_team_id}: ${r.flags_captured} captured, ${r.flags_submitted} submitted`;
+        if(r.error)text+=` [${r.error}]`; text+='\n';
+      }); alert(text);
+    }
+
+    // VPN download
+    async function downloadVPN() {
+      const msg = document.getElementById('vpn-msg');
+      try {
+        const resp = await fetch('/api/ad/vpn', { credentials: 'include' });
+        if (!resp.ok) { const e=await resp.json().catch(()=>({})); msg.textContent='❌ '+(e.error||resp.statusText); return; }
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href=url; a.download='team-wg.conf'; a.click();
+        URL.revokeObjectURL(url);
+        msg.textContent='✅ Config downloaded! Import into WireGuard.'; msg.style.color='var(--ctf-green)';
+      } catch(e) { msg.textContent='❌ '+e.message; msg.style.color='var(--ctf-red)'; }
+    }
+
+    // Manual flag submit
+    async function submitManualFlags() {
+      const raw = document.getElementById('manual-flags').value.trim();
+      const msg = document.getElementById('manual-submit-msg');
+      if (!raw) { msg.textContent='Enter at least one flag.'; return; }
+      const flags = raw.split('\n').map(s=>s.trim()).filter(Boolean);
+      const res = await api.post('/api/ad/flags/submit',{flags});
+      if (res&&res.submitted!=null) {
+        msg.textContent=`✅ Submitted ${res.submitted} flag(s) (HTTP ${res.server_status}).`;
+        msg.style.color='var(--ctf-green)';
+      } else { msg.textContent='❌ '+(res&&res.error||'Submission failed'); msg.style.color='var(--ctf-red)'; }
+    }
+
+    function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    // Init
+    loadStatus(); loadServices(); loadAdScoreboard(); loadSploits();
+    setInterval(()=>{ loadServices(); loadAdScoreboard(); }, 30000);
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plugins – heCsTackForse</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg sticky-top">
+    <div class="container-fluid px-4">
+      <a class="navbar-brand" href="/">heCsTackForse</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navMenu">
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item"><a class="nav-link" data-i18n="nav.challenges" href="/challenges">Challenges</a></li>
+          <li class="nav-item"><a class="nav-link" data-i18n="nav.scoreboard" href="/scoreboard">Scoreboard</a></li>
+        </ul>
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item"><a class="nav-link" data-i18n="nav.admin" href="/admin">Admin</a></li>
+          <li class="nav-item"><a class="nav-link active" href="/admin/plugins">Plugins</a></li>
+          <li class="nav-item"><a class="nav-link" data-i18n="nav.profile" href="/profile">Profile</a></li>
+          <li class="nav-item"><a class="nav-link" data-i18n="nav.logout" href="#" onclick="logout()">Logout</a></li>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown"><span id="lang-toggle-label">EN</span></a>
+            <ul class="dropdown-menu dropdown-menu-end" style="min-width:120px">
+              <li><a class="dropdown-item" href="#" onclick="setLang('en');return false">English</a></li>
+              <li><a class="dropdown-item" href="#" onclick="setLang('ru');return false">Русский</a></li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="page-container">
+    <h1 class="page-title">Plugins</h1>
+    <p class="text-muted mb-4">Plugin-specific admin pages live here. Use the cards below to open the settings pages exposed by installed plugins.</p>
+
+    <div class="row g-4 mb-4">
+      <div class="col-md-6">
+        <div class="card p-4 h-100">
+          <h5 class="mb-2">Chat Notifier</h5>
+          <p class="text-muted mb-3">Configures Slack, Discord, and Telegram notifications for solves and admin announcements.</p>
+          <a class="btn btn-primary" href="/admin/plugins/chat-notifier">Open Chat Notifier Settings</a>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card p-4 h-100">
+          <h5 class="mb-2">Loaded Plugin Registry</h5>
+          <div id="plugin-catalog" class="text-muted small">Loading…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/i18n.js"></script>
+  <script>
+    function escHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    async function logout() {
+      await apiFetch('/api/auth/logout', { method: 'POST' });
+      location.href = '/login';
+    }
+
+    async function loadPluginCatalog() {
+      const container = document.getElementById('plugin-catalog');
+      try {
+        const plugins = await apiFetch('/api/plugins');
+        const sections = [
+          ['Scorers', plugins.scorers || []],
+          ['Flag checkers', plugins.flag_checkers || []],
+          ['Notifiers', plugins.notifiers || []],
+          ['Challenge types', plugins.challenge_types || []],
+        ];
+        container.innerHTML = sections.map(([title, items]) => `
+          <div class="mb-3">
+            <div class="fw-semibold mb-1">${escHtml(title)}</div>
+            <div>${items.length ? items.map(item => `<span class="tag me-1 mb-1 d-inline-block">${escHtml(item)}</span>`).join(' ') : '<span class="text-muted">None loaded</span>'}</div>
+          </div>
+        `).join('');
+      } catch (err) {
+        container.innerHTML = `<div class="text-danger">${escHtml(err.message)}</div>`;
+      }
+    }
+
+    (async () => {
+      await initI18n();
+      const user = await getMe();
+      if (!user || user.role !== 'admin') {
+        location.href = '/';
+        return;
+      }
+      await loadPluginCatalog();
+    })();
+  </script>
+</body>
+</html>

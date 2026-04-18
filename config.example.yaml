@@ -1,0 +1,54 @@
+server:
+  host: 0.0.0.0
+  port: 8080
+  secret_key: change-me-in-production-use-a-long-random-string
+  static_dir: ./frontend
+
+database:
+  driver: sqlite    # sqlite | postgres
+  dsn: ./ctf.db
+  # PostgreSQL example:
+  # driver: postgres
+  # dsn: "postgres://ctf:ctf@localhost:5432/ctf?sslmode=disable"
+
+ctf:
+  name: "My CTF"
+  mode: ctf           # ctf | ad (attack & defence)
+  team_mode: false
+  registration_open: true
+  scoring: static     # static | dynamic | <custom scorer name>
+  flag_prefix: "FLAG{"
+  flag_suffix: "}"
+  seed_challenges: true  # insert built-in sample tasks on first run (skipped if challenges already exist)
+
+deployer:
+  instance_ttl: 4h
+  backends:
+    docker:
+      enabled: false
+      registry: ""
+      network: ctf-net
+    kubernetes:
+      enabled: false
+      kubeconfig: ""
+      namespace: ctf
+    pve:
+      enabled: false
+      url: https://pve.example.com:8006
+      token_id: user@pam!token
+      token_secret: secret
+      node: pve
+      vm_template: 100
+      insecure_skip_verify: false  # set true only if PVE uses a self-signed certificate
+
+ad:
+  round_duration: 5m
+  flag_lifetime: 2
+  teams: []
+
+plugins:
+  enabled: false
+  python: python
+  script: ./python/ctfd_bridge.py
+  plugin_dirs: []
+  modules: []

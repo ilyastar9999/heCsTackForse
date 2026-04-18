@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat Notifier – heCsTackForse</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg sticky-top">
+    <div class="container-fluid px-4">
+      <a class="navbar-brand" href="/">heCsTackForse</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navMenu">
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item"><a class="nav-link" data-i18n="nav.challenges" href="/challenges">Challenges</a></li>
+          <li class="nav-item"><a class="nav-link" data-i18n="nav.scoreboard" href="/scoreboard">Scoreboard</a></li>
+        </ul>
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item"><a class="nav-link" data-i18n="nav.admin" href="/admin">Admin</a></li>
+          <li class="nav-item"><a class="nav-link active" href="/admin/plugins">Plugins</a></li>
+          <li class="nav-item"><a class="nav-link" data-i18n="nav.profile" href="/profile">Profile</a></li>
+          <li class="nav-item"><a class="nav-link" data-i18n="nav.logout" href="#" onclick="logout()">Logout</a></li>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown"><span id="lang-toggle-label">EN</span></a>
+            <ul class="dropdown-menu dropdown-menu-end" style="min-width:120px">
+              <li><a class="dropdown-item" href="#" onclick="setLang('en');return false">English</a></li>
+              <li><a class="dropdown-item" href="#" onclick="setLang('ru');return false">Русский</a></li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="page-container">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+      <div>
+        <h1 class="page-title mb-2">Chat Notifier</h1>
+        <p class="text-muted mb-0">Configure the plugin-specific notifier settings for Slack, Discord, and Telegram.</p>
+      </div>
+      <a class="btn btn-outline-secondary" href="/admin/plugins">Back to Plugins</a>
+    </div>
+
+    <div class="row g-4">
+      <div class="col-lg-7">
+        <div class="card p-4">
+          <div id="plugin-error" class="alert alert-danger d-none"></div>
+          <div id="plugin-success" class="alert alert-success d-none"></div>
+
+          <div class="mb-3">
+            <label class="form-label">Notifier type</label>
+            <select class="form-select" id="notifier-type"></select>
+          </div>
+
+          <div id="notifier-settings-slack" class="notifier-settings mb-3">
+            <label class="form-label">Slack webhook URL</label>
+            <input class="form-control" id="notifier_slack_webhook_url" type="text" placeholder="https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX">
+          </div>
+
+          <div id="notifier-settings-discord" class="notifier-settings mb-3" style="display:none">
+            <label class="form-label">Discord webhook URL</label>
+            <input class="form-control" id="notifier_discord_webhook_url" type="text" placeholder="https://discord.com/api/webhooks/{webhook.id}/{webhook.token}">
+          </div>
+
+          <div id="notifier-settings-telegram" class="notifier-settings mb-3" style="display:none">
+            <div class="mb-3">
+              <label class="form-label">Telegram bot token</label>
+              <input class="form-control" id="notifier_telegram_bot_token" type="text" placeholder="id:token">
+            </div>
+            <div>
+              <label class="form-label">Telegram chat ID</label>
+              <input class="form-control" id="notifier_telegram_chat_id" type="text" placeholder="@channelusername or 12345678">
+            </div>
+          </div>
+
+          <hr class="my-4">
+
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="notifier_send_notifications">
+            <label class="form-check-label" for="notifier_send_notifications">Send notifications</label>
+          </div>
+
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="notifier_send_solves">
+            <label class="form-check-label" for="notifier_send_solves">Send solves</label>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Solve text</label>
+            <input class="form-control" id="notifier_solve_msg" type="text" placeholder="{solver} solved {challenge} ({solve_num} solve)">
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label">Stop solve notifications after X solves</label>
+            <input class="form-control" id="notifier_solve_count" type="number" min="0" placeholder="infinite">
+          </div>
+
+          <div class="d-flex gap-2">
+            <button class="btn btn-primary" onclick="saveNotifierConfig()">Save Settings</button>
+            <a class="btn btn-secondary" href="/admin">Back to Admin</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-5">
+        <div class="card p-4 mb-4">
+          <h5 class="mb-3">Loaded notifier backends</h5>
+          <div id="loaded-notifiers" class="text-muted small">Loading…</div>
+        </div>
+
+        <div class="card p-4">
+          <h5 class="mb-3">What this page controls</h5>
+          <p class="text-muted mb-2">This page is the dedicated admin surface for the chat notifier plugin. It stores the same values the plugin expects in configuration.</p>
+          <p class="text-muted mb-0">The notifier sections are shown dynamically so you can keep plugin-specific settings in one place instead of mixing them into the global config screen.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/i18n.js"></script>
+  <script>
+    const fallbackNotifierTypes = ['slack', 'discord', 'telegram'];
+
+    function escHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function notifierLabel(name) {
+      return String(name)
+        .replace(/[_-]+/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase());
+    }
+
+    function showNotifierSettings(name) {
+      document.querySelectorAll('.notifier-settings').forEach(section => {
+        section.style.display = section.id === 'notifier-settings-' + name ? '' : 'none';
+      });
+    }
+
+    async function logout() {
+      await apiFetch('/api/auth/logout', { method: 'POST' });
+      location.href = '/login';
+    }
+
+    async function loadNotifierCatalog() {
+      const select = document.getElementById('notifier-type');
+      const list = document.getElementById('loaded-notifiers');
+      let notifierNames = fallbackNotifierTypes.slice();
+      try {
+        const plugins = await apiFetch('/api/plugins');
+        const loaded = Array.isArray(plugins.notifiers) ? plugins.notifiers : [];
+        loaded.forEach(name => {
+          if (!notifierNames.includes(name)) notifierNames.push(name);
+        });
+        list.innerHTML = loaded.length
+          ? loaded.map(name => `<span class="tag me-1 mb-1 d-inline-block">${escHtml(name)}</span>`).join(' ')
+          : '<span class="text-muted">No notifier plugins loaded.</span>';
+      } catch (err) {
+        list.innerHTML = `<span class="text-danger">${escHtml(err.message)}</span>`;
+      }
+
+      select.innerHTML = notifierNames.map(name => `<option value="${escHtml(name)}">${escHtml(notifierLabel(name))}</option>`).join('');
+    }
+
+    async function loadNotifierConfig() {
+      const cfg = await apiFetch('/api/admin/config').catch(() => ({}));
+      document.getElementById('notifier-type').value = cfg.notifier_type || fallbackNotifierTypes[0];
+      document.getElementById('notifier_send_notifications').checked = !!cfg.notifier_send_notifications;
+      document.getElementById('notifier_send_solves').checked = !!cfg.notifier_send_solves;
+      document.getElementById('notifier_solve_msg').value = cfg.notifier_solve_msg || '{solver} solved {challenge} ({solve_num} solve)';
+      document.getElementById('notifier_solve_count').value = cfg.notifier_solve_count ?? '';
+      document.getElementById('notifier_slack_webhook_url').value = cfg.notifier_slack_webhook_url || '';
+      document.getElementById('notifier_discord_webhook_url').value = cfg.notifier_discord_webhook_url || '';
+      document.getElementById('notifier_telegram_bot_token').value = cfg.notifier_telegram_bot_token || '';
+      document.getElementById('notifier_telegram_chat_id').value = cfg.notifier_telegram_chat_id || '';
+      showNotifierSettings(document.getElementById('notifier-type').value);
+    }
+
+    async function saveNotifierConfig() {
+      const errEl = document.getElementById('plugin-error');
+      const okEl = document.getElementById('plugin-success');
+      errEl.classList.add('d-none');
+      okEl.classList.add('d-none');
+      const body = {
+        notifier_type: document.getElementById('notifier-type').value,
+        notifier_send_notifications: document.getElementById('notifier_send_notifications').checked,
+        notifier_send_solves: document.getElementById('notifier_send_solves').checked,
+        notifier_solve_msg: document.getElementById('notifier_solve_msg').value,
+        notifier_solve_count: document.getElementById('notifier_solve_count').value,
+        notifier_slack_webhook_url: document.getElementById('notifier_slack_webhook_url').value,
+        notifier_discord_webhook_url: document.getElementById('notifier_discord_webhook_url').value,
+        notifier_telegram_bot_token: document.getElementById('notifier_telegram_bot_token').value,
+        notifier_telegram_chat_id: document.getElementById('notifier_telegram_chat_id').value,
+      };
+      try {
+        await apiFetch('/api/admin/config', { method: 'PUT', body: JSON.stringify(body) });
+        okEl.textContent = 'Notifier settings saved.';
+        okEl.classList.remove('d-none');
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.classList.remove('d-none');
+      }
+    }
+
+    (async () => {
+      await initI18n();
+      const user = await getMe();
+      if (!user || user.role !== 'admin') {
+        location.href = '/';
+        return;
+      }
+      await loadNotifierCatalog();
+      await loadNotifierConfig();
+      document.getElementById('notifier-type').addEventListener('change', e => showNotifierSettings(e.target.value));
+    })();
+  </script>
+</body>
+</html>
