@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 
@@ -563,11 +564,25 @@ func (s *Server) handleAdminUploadFile(c echo.Context) error {
 	}
 	defer src.Close()
 
+	// Validate file extension against an allowlist of safe types
+	ext := strings.ToLower(filepath.Ext(file.Filename))
+	allowedExts := map[string]bool{
+		".zip": true, ".tar": true, ".gz": true, ".7z": true, ".rar": true,
+		".pdf": true, ".txt": true, ".md": true,
+		".png": true, ".jpg": true, ".jpeg": true, ".gif": true, ".svg": true,
+		".py": true, ".c": true, ".cpp": true, ".go": true, ".js": true, ".ts": true,
+		".json": true, ".yaml": true, ".yml": true, ".xml": true,
+		".pcap": true, ".pcapng": true, ".cap": true,
+		".bin": true, ".elf": true, ".out": true,
+	}
+	if ext != "" && !allowedExts[ext] {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "file type not allowed"})
+	}
+
 	randBytes := make([]byte, 16)
 	if _, err := crand.Read(randBytes); err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "internal error"})
 	}
-	ext := filepath.Ext(file.Filename)
 	uniqueName := hex.EncodeToString(randBytes) + ext
 
 	uploadsDir := filepath.Join(s.cfg.Server.StaticDir, "static", "uploads")
