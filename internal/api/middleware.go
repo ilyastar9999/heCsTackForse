@@ -1,66 +1,60 @@
 package api
 
 import (
-	"context"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v4"
 )
 
-type contextKey string
+const userIDKey = "userID"
+const userRoleKey = "userRole"
 
-const userIDKey contextKey = "userID"
-const userRoleKey contextKey = "userRole"
-
-func (s *Server) authMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func (s *Server) authMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
 		tokenStr := ""
-		authHeader := r.Header.Get("Authorization")
+		authHeader := c.Request().Header.Get("Authorization")
 		if strings.HasPrefix(authHeader, "Bearer ") {
 			tokenStr = authHeader[7:]
 		}
 		if tokenStr == "" {
-			cookie, err := r.Cookie("token")
+			cookie, err := c.Request().Cookie("token")
 			if err == nil {
 				tokenStr = cookie.Value
 			}
 		}
 		if tokenStr == "" {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
+			return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 		}
 		claims := jwt.MapClaims{}
 		token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (interface{}, error) {
 			return []byte(s.cfg.Server.SecretKey), nil
 		})
 		if err != nil || !token.Valid {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
+			return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 		}
 		userID, ok := claims["user_id"]
 		if !ok {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
+			return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 		}
 		role, _ := claims["role"].(string)
-		ctx := context.WithValue(r.Context(), userIDKey, int64(userID.(float64)))
-		ctx = context.WithValue(ctx, userRoleKey, role)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
+		c.Set(userIDKey, int64(userID.(float64)))
+		c.Set(userRoleKey, role)
+		return next(c)
+	}
 }
 
-func (s *Server) adminMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		role, _ := r.Context().Value(userRoleKey).(string)
+func (s *Server) adminMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		role, _ := c.Get(userRoleKey).(string)
 		if role != "admin" {
-			http.Error(w, "forbidden", http.StatusForbidden)
-			return
+			return c.JSON(http.StatusForbidden, map[string]string{"error": "forbidden"})
 		}
-		next.ServeHTTP(w, r)
-	})
+		return next(c)
+	}
 }
 
 type rateLimiter struct {
@@ -113,34 +107,33 @@ func (rl *rateLimiter) allow(key string, limit int, window time.Duration) bool {
 // X-Forwarded-For is intentionally NOT trusted here to prevent rate-limit bypass
 // via header spoofing. If the service runs behind a trusted reverse proxy, this
 // function can be extended to validate the proxy's IP before trusting XFF.
-func getClientIP(r *http.Request) string {
-	ip := r.RemoteAddr
+func getClientIP(c echo.Context) string {
+	ip := c.Request().RemoteAddr
 	if idx := strings.LastIndex(ip, ":"); idx != -1 {
 		ip = ip[:idx]
 	}
 	return ip
 }
 
-func (s *Server) rateLimitMiddleware(limit int, window time.Duration) func(http.Handler) http.Handler {
+func (s *Server) rateLimitMiddleware(limit int, window time.Duration) echo.MiddlewareFunc {
 	rl := s.rateLimiter
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ip := getClientIP(r)
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			ip := getClientIP(c)
 			if !rl.allow(ip, limit, window) {
-				http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
-				return
+				return c.JSON(http.StatusTooManyRequests, map[string]string{"error": "rate limit exceeded"})
 			}
-			next.ServeHTTP(w, r)
-		})
+			return next(c)
+		}
 	}
 }
 
-func getUserID(r *http.Request) int64 {
-	id, _ := r.Context().Value(userIDKey).(int64)
+func getUserID(c echo.Context) int64 {
+	id, _ := c.Get(userIDKey).(int64)
 	return id
 }
 
-func getUserRole(r *http.Request) string {
-	role, _ := r.Context().Value(userRoleKey).(string)
+func getUserRole(c echo.Context) string {
+	role, _ := c.Get(userRoleKey).(string)
 	return role
 }

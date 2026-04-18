@@ -3,6 +3,8 @@ package api
 import (
 	"net/http"
 
+	"github.com/labstack/echo/v4"
+
 	"github.com/ilyastar9999/heCsTackForse/internal/models"
 )
 
@@ -14,23 +16,21 @@ type ScoreboardEntry struct {
 	Solves int          `json:"solves"`
 }
 
-func (s *Server) handleScoreboard(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleScoreboard(c echo.Context) error {
 	if s.cfg.CTF.TeamMode {
-		s.handleTeamScoreboard(w, r)
-		return
+		return s.handleTeamScoreboard(c)
 	}
-	s.handleUserScoreboard(w, r)
+	return s.handleUserScoreboard(c)
 }
 
-func (s *Server) handleUserScoreboard(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleUserScoreboard(c echo.Context) error {
 	rows, err := s.db.Query(
 		`SELECT u.id, u.username, u.role, u.score, u.created_at,
 		(SELECT COUNT(*) FROM submissions WHERE user_id=u.id AND is_correct=1) as solves
 		FROM users u ORDER BY u.score DESC, u.created_at ASC LIMIT 100`,
 	)
 	if err != nil {
-		jsonError(w, "db error", http.StatusInternalServerError)
-		return
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
 	}
 	defer rows.Close()
 	var entries []ScoreboardEntry
@@ -47,18 +47,17 @@ func (s *Server) handleUserScoreboard(w http.ResponseWriter, r *http.Request) {
 	if entries == nil {
 		entries = []ScoreboardEntry{}
 	}
-	jsonResponse(w, http.StatusOK, entries)
+	return c.JSON(http.StatusOK, entries)
 }
 
-func (s *Server) handleTeamScoreboard(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleTeamScoreboard(c echo.Context) error {
 	rows, err := s.db.Query(
 		`SELECT t.id, t.name, t.score, t.created_at,
 		(SELECT COUNT(DISTINCT s.challenge_id) FROM submissions s JOIN team_members tm ON s.user_id=tm.user_id WHERE tm.team_id=t.id AND s.is_correct=1) as solves
 		FROM teams t ORDER BY t.score DESC, t.created_at ASC LIMIT 100`,
 	)
 	if err != nil {
-		jsonError(w, "db error", http.StatusInternalServerError)
-		return
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
 	}
 	defer rows.Close()
 	var entries []ScoreboardEntry
@@ -75,5 +74,5 @@ func (s *Server) handleTeamScoreboard(w http.ResponseWriter, r *http.Request) {
 	if entries == nil {
 		entries = []ScoreboardEntry{}
 	}
-	jsonResponse(w, http.StatusOK, entries)
+	return c.JSON(http.StatusOK, entries)
 }

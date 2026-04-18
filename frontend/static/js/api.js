@@ -21,3 +21,20 @@ async function getMe() {
     return null;
   }
 }
+
+// Namespace object used by ad.html and other pages
+const api = {
+  async me() { return getMe(); },
+  async get(path) {
+    try { return await apiFetch(path); } catch { return null; }
+  },
+  async post(path, body) {
+    try { return await apiFetch(path, { method: 'POST', body: JSON.stringify(body) }); } catch(e) { return { error: e.message }; }
+  },
+  async put(path, body) {
+    try { return await apiFetch(path, { method: 'PUT', body: JSON.stringify(body) }); } catch(e) { return { error: e.message }; }
+  },
+  async del(path) {
+    try { return await apiFetch(path, { method: 'DELETE' }); } catch(e) { return { error: e.message }; }
+  },
+};

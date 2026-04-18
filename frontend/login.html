@@ -4,36 +4,49 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login – heCsTackForse</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-  <nav class="navbar">
-    <a class="brand" href="/">heCsTackForse</a>
-    <div class="nav-links">
-      <a href="/challenges">Challenges</a>
-      <a href="/scoreboard">Scoreboard</a>
-      <a href="/login">Login</a>
-      <a href="/register">Register</a>
+  <nav class="navbar navbar-expand-lg sticky-top">
+    <div class="container-fluid px-4">
+      <a class="navbar-brand" href="/">heCsTackForse</a>
+      <div class="collapse navbar-collapse">
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item"><a class="nav-link" href="/challenges">Challenges</a></li>
+          <li class="nav-item"><a class="nav-link" href="/scoreboard">Scoreboard</a></li>
+        </ul>
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item"><a class="nav-link active" href="/login">Login</a></li>
+          <li class="nav-item"><a class="nav-link" href="/register">Register</a></li>
+        </ul>
+      </div>
     </div>
   </nav>
-  <main class="form-page">
-    <div class="form-card">
-      <h2>Login</h2>
-      <div id="error-msg" class="alert alert-error" style="display:none"></div>
+
+  <div class="auth-page">
+    <div class="auth-card">
+      <div class="auth-logo"><span>heCsTackForse</span></div>
+      <h2>Sign In</h2>
+      <div id="error-msg" class="alert alert-danger d-none"></div>
       <form id="login-form">
-        <div class="form-group">
-          <label>Username</label>
-          <input type="text" id="username" name="username" required autocomplete="username">
+        <div class="mb-3">
+          <label class="form-label">Username</label>
+          <input type="text" class="form-control" id="username" name="username" required autocomplete="username" placeholder="Enter username">
         </div>
-        <div class="form-group">
-          <label>Password</label>
-          <input type="password" id="password" name="password" required autocomplete="current-password">
+        <div class="mb-4">
+          <label class="form-label">Password</label>
+          <input type="password" class="form-control" id="password" name="password" required autocomplete="current-password" placeholder="Enter password">
         </div>
-        <button type="submit" class="btn btn-primary btn-full">Login</button>
+        <button type="submit" class="btn btn-primary w-100">Sign In</button>
       </form>
-      <p class="form-footer">Don't have an account? <a href="/register">Register</a></p>
+      <p class="text-center mt-3 mb-0" style="color:var(--ctf-muted);font-size:.875rem">
+        Don't have an account? <a href="/register">Register</a>
+      </p>
     </div>
-  </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="/static/js/api.js"></script>
   <script>
     document.getElementById('login-form').addEventListener('submit', async (e) => {
@@ -41,17 +54,16 @@
       const username = document.getElementById('username').value;
       const password = document.getElementById('password').value;
       const errEl = document.getElementById('error-msg');
-      errEl.style.display = 'none';
+      errEl.classList.add('d-none');
       try {
-        const data = await apiFetch('/api/auth/login', {
+        await apiFetch('/api/auth/login', {
           method: 'POST',
           body: JSON.stringify({ username, password }),
         });
-        // Token is stored in an HttpOnly cookie set by the server; no localStorage needed.
         window.location.href = '/challenges';
       } catch (err) {
         errEl.textContent = err.message || 'Login failed';
-        errEl.style.display = 'block';
+        errEl.classList.remove('d-none');
       }
     });
   </script>

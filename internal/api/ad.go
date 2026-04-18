@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/labstack/echo/v4"
 
 	"github.com/ilyastar9999/heCsTackForse/internal/ad"
 	"github.com/ilyastar9999/heCsTackForse/internal/models"
@@ -17,16 +17,16 @@ import (
 // AD status
 // ────────────────────────────────────────────────────────────────────────────
 
-func (s *Server) handleADStatus(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleADStatus(c echo.Context) error {
 	round := int64(0)
 	if s.adEngine != nil {
 		round = s.adEngine.CurrentRound()
 	}
-	jsonResponse(w, http.StatusOK, map[string]any{
-		"round":          round,
-		"round_duration": s.cfg.AD.RoundDuration,
+	return c.JSON(http.StatusOK, map[string]any{
+		"round":           round,
+		"round_duration":  s.cfg.AD.RoundDuration,
 		"flag_submit_url": s.cfg.AD.FlagSubmitURL,
-		"vpn_enabled":    s.cfg.AD.VPN.Enabled,
+		"vpn_enabled":     s.cfg.AD.VPN.Enabled,
 	})
 }
 
@@ -34,7 +34,7 @@ func (s *Server) handleADStatus(w http.ResponseWriter, r *http.Request) {
 // AD scoreboard — attack/defence points per team
 // ────────────────────────────────────────────────────────────────────────────
 
-func (s *Server) handleADScoreboard(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleADScoreboard(c echo.Context) error {
 	rows, err := s.db.Query(`
 		SELECT t.id, t.name,
 		       COALESCE(SUM(CASE WHEN svc.status='up' THEN 1 ELSE 0 END), 0) AS defence_pts,
@@ -51,8 +51,7 @@ func (s *Server) handleADScoreboard(w http.ResponseWriter, r *http.Request) {
 		          COALESCE(COUNT(DISTINCT sr.id), 0)) DESC
 	`)
 	if err != nil {
-		jsonError(w, "db error", http.StatusInternalServerError)
-		return
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
 	}
 	defer rows.Close()
 	type entry struct {
@@ -74,14 +73,14 @@ func (s *Server) handleADScoreboard(w http.ResponseWriter, r *http.Request) {
 	if board == nil {
 		board = []entry{}
 	}
-	jsonResponse(w, http.StatusOK, board)
+	return c.JSON(http.StatusOK, board)
 }
 
 // ────────────────────────────────────────────────────────────────────────────
 // Service status grid
 // ────────────────────────────────────────────────────────────────────────────
 
-func (s *Server) handleADServices(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleADServices(c echo.Context) error {
 	rows, err := s.db.Query(`
 		SELECT svc.challenge_id, svc.team_id, svc.status, svc.round, svc.score, svc.checked_at
 		FROM ad_services svc
@@ -95,8 +94,7 @@ func (s *Server) handleADServices(w http.ResponseWriter, r *http.Request) {
 		ORDER BY svc.challenge_id, svc.team_id
 	`)
 	if err != nil {
-		jsonError(w, "db error", http.StatusInternalServerError)
-		return
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
 	}
 	defer rows.Close()
 	var statuses []models.ADServiceStatus
@@ -110,22 +108,20 @@ func (s *Server) handleADServices(w http.ResponseWriter, r *http.Request) {
 	if statuses == nil {
 		statuses = []models.ADServiceStatus{}
 	}
-	jsonResponse(w, http.StatusOK, statuses)
+	return c.JSON(http.StatusOK, statuses)
 }
 
 // ────────────────────────────────────────────────────────────────────────────
 // VPN config download
 // ────────────────────────────────────────────────────────────────────────────
 
-func (s *Server) handleADGetVPN(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleADGetVPN(c echo.Context) error {
 	if !s.cfg.AD.VPN.Enabled {
-		jsonError(w, "VPN not enabled", http.StatusNotFound)
-		return
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "VPN not enabled"})
 	}
-	teamID := s.getTeamIDForUser(getUserID(r))
+	teamID := s.getTeamIDForUser(getUserID(c))
 	if teamID == 0 {
-		jsonError(w, "you must be in a team to get VPN config", http.StatusBadRequest)
-		return
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "you must be in a team to get VPN config"})
 	}
 
 	// Fetch or create VPN peer for this team
@@ -139,15 +135,13 @@ func (s *Server) handleADGetVPN(w http.ResponseWriter, r *http.Request) {
 		// Generate new keypair
 		privB64, pubB64, genErr := ad.GenerateWireGuardKeys()
 		if genErr != nil {
-			jsonError(w, "failed to generate VPN keys: "+genErr.Error(), http.StatusInternalServerError)
-			return
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to generate VPN keys: " + genErr.Error()})
 		}
 		// Assign team IP from config: base + teamID + ".1/24"
 		base := s.cfg.AD.VPN.TeamSubnetBase
 		if base == "" {
 			base = "10.8."
 		}
-		teamIP := fmt.Sprintf("%s%d.1/24", base, teamID)
 		allowedIP := fmt.Sprintf("%s%d.0/24", base, teamID)
 
 		newID, insErr := s.db.InsertGetID(
@@ -155,17 +149,14 @@ func (s *Server) handleADGetVPN(w http.ResponseWriter, r *http.Request) {
 			teamID, privB64, pubB64, allowedIP,
 		)
 		if insErr != nil {
-			jsonError(w, "db error: "+insErr.Error(), http.StatusInternalServerError)
-			return
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error: " + insErr.Error()})
 		}
 		peer.TeamID = teamID
 		peer.PrivateKey = privB64
 		peer.PublicKey = pubB64
-		peer.AllowedIP = teamIP
 		peer.ID = newID
 	} else if err != nil {
-		jsonError(w, "db error", http.StatusInternalServerError)
-		return
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
 	}
 
 	cfg := s.cfg.AD.VPN
@@ -185,21 +176,19 @@ func (s *Server) handleADGetVPN(w http.ResponseWriter, r *http.Request) {
 		cfg.DNS,
 	)
 
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="team%d-wg.conf"`, teamID))
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte(conf))
+	c.Response().Header().Set("Content-Type", "text/plain; charset=utf-8")
+	c.Response().Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="team%d-wg.conf"`, teamID))
+	return c.String(http.StatusOK, conf)
 }
 
 // ────────────────────────────────────────────────────────────────────────────
 // Sploit CRUD
 // ────────────────────────────────────────────────────────────────────────────
 
-func (s *Server) handleADListSploits(w http.ResponseWriter, r *http.Request) {
-	teamID := s.getTeamIDForUser(getUserID(r))
+func (s *Server) handleADListSploits(c echo.Context) error {
+	teamID := s.getTeamIDForUser(getUserID(c))
 	if teamID == 0 {
-		jsonError(w, "you must be in a team", http.StatusBadRequest)
-		return
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "you must be in a team"})
 	}
 	rows, err := s.db.Query(
 		`SELECT id, team_id, challenge_id, name, language, enabled, created_at, last_run_at
@@ -207,8 +196,7 @@ func (s *Server) handleADListSploits(w http.ResponseWriter, r *http.Request) {
 		teamID,
 	)
 	if err != nil {
-		jsonError(w, "db error", http.StatusInternalServerError)
-		return
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
 	}
 	defer rows.Close()
 	var sploits []models.Sploit
@@ -223,14 +211,13 @@ func (s *Server) handleADListSploits(w http.ResponseWriter, r *http.Request) {
 	if sploits == nil {
 		sploits = []models.Sploit{}
 	}
-	jsonResponse(w, http.StatusOK, sploits)
+	return c.JSON(http.StatusOK, sploits)
 }
 
-func (s *Server) handleADCreateSploit(w http.ResponseWriter, r *http.Request) {
-	teamID := s.getTeamIDForUser(getUserID(r))
+func (s *Server) handleADCreateSploit(c echo.Context) error {
+	teamID := s.getTeamIDForUser(getUserID(c))
 	if teamID == 0 {
-		jsonError(w, "you must be in a team", http.StatusBadRequest)
-		return
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "you must be in a team"})
 	}
 	var req struct {
 		ChallengeID int64  `json:"challenge_id"`
@@ -238,13 +225,11 @@ func (s *Server) handleADCreateSploit(w http.ResponseWriter, r *http.Request) {
 		Language    string `json:"language"`
 		Script      string `json:"script"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		jsonError(w, "invalid request", http.StatusBadRequest)
-		return
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
 	}
 	if req.Script == "" || req.Name == "" {
-		jsonError(w, "name and script are required", http.StatusBadRequest)
-		return
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "name and script are required"})
 	}
 	if req.Language == "" {
 		req.Language = "python3"
@@ -254,19 +239,17 @@ func (s *Server) handleADCreateSploit(w http.ResponseWriter, r *http.Request) {
 		teamID, req.ChallengeID, req.Name, req.Language, req.Script,
 	)
 	if err != nil {
-		jsonError(w, "db error: "+err.Error(), http.StatusInternalServerError)
-		return
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error: " + err.Error()})
 	}
-	jsonResponse(w, http.StatusCreated, map[string]any{"id": id, "message": "sploit created"})
+	return c.JSON(http.StatusCreated, map[string]any{"id": id, "message": "sploit created"})
 }
 
-func (s *Server) handleADUpdateSploit(w http.ResponseWriter, r *http.Request) {
-	sploitID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+func (s *Server) handleADUpdateSploit(c echo.Context) error {
+	sploitID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		jsonError(w, "invalid id", http.StatusBadRequest)
-		return
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid id"})
 	}
-	teamID := s.getTeamIDForUser(getUserID(r))
+	teamID := s.getTeamIDForUser(getUserID(c))
 
 	var req struct {
 		Name     string `json:"name"`
@@ -274,20 +257,17 @@ func (s *Server) handleADUpdateSploit(w http.ResponseWriter, r *http.Request) {
 		Script   string `json:"script"`
 		Enabled  *bool  `json:"enabled"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		jsonError(w, "invalid request", http.StatusBadRequest)
-		return
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
 	}
 
 	// Verify ownership
 	var ownerTeam int64
 	if err := s.db.QueryRow(`SELECT team_id FROM ad_sploits WHERE id=?`, sploitID).Scan(&ownerTeam); err != nil {
-		jsonError(w, "not found", http.StatusNotFound)
-		return
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "not found"})
 	}
-	if ownerTeam != teamID && getUserRole(r) != "admin" {
-		jsonError(w, "forbidden", http.StatusForbidden)
-		return
+	if ownerTeam != teamID && getUserRole(c) != "admin" {
+		return c.JSON(http.StatusForbidden, map[string]string{"error": "forbidden"})
 	}
 
 	if req.Enabled != nil {
@@ -306,45 +286,39 @@ func (s *Server) handleADUpdateSploit(w http.ResponseWriter, r *http.Request) {
 	if req.Language != "" {
 		_, _ = s.db.Exec(`UPDATE ad_sploits SET language=? WHERE id=?`, req.Language, sploitID)
 	}
-	jsonResponse(w, http.StatusOK, map[string]string{"message": "updated"})
+	return c.JSON(http.StatusOK, map[string]string{"message": "updated"})
 }
 
-func (s *Server) handleADDeleteSploit(w http.ResponseWriter, r *http.Request) {
-	sploitID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+func (s *Server) handleADDeleteSploit(c echo.Context) error {
+	sploitID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		jsonError(w, "invalid id", http.StatusBadRequest)
-		return
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid id"})
 	}
-	teamID := s.getTeamIDForUser(getUserID(r))
+	teamID := s.getTeamIDForUser(getUserID(c))
 	var ownerTeam int64
 	if err := s.db.QueryRow(`SELECT team_id FROM ad_sploits WHERE id=?`, sploitID).Scan(&ownerTeam); err != nil {
-		jsonError(w, "not found", http.StatusNotFound)
-		return
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "not found"})
 	}
-	if ownerTeam != teamID && getUserRole(r) != "admin" {
-		jsonError(w, "forbidden", http.StatusForbidden)
-		return
+	if ownerTeam != teamID && getUserRole(c) != "admin" {
+		return c.JSON(http.StatusForbidden, map[string]string{"error": "forbidden"})
 	}
 	_, _ = s.db.Exec(`DELETE FROM ad_sploit_results WHERE sploit_id=?`, sploitID)
 	_, _ = s.db.Exec(`DELETE FROM ad_sploits WHERE id=?`, sploitID)
-	jsonResponse(w, http.StatusOK, map[string]string{"message": "deleted"})
+	return c.JSON(http.StatusOK, map[string]string{"message": "deleted"})
 }
 
-func (s *Server) handleADSploitResults(w http.ResponseWriter, r *http.Request) {
-	sploitID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+func (s *Server) handleADSploitResults(c echo.Context) error {
+	sploitID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		jsonError(w, "invalid id", http.StatusBadRequest)
-		return
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid id"})
 	}
-	teamID := s.getTeamIDForUser(getUserID(r))
+	teamID := s.getTeamIDForUser(getUserID(c))
 	var ownerTeam int64
 	if err := s.db.QueryRow(`SELECT team_id FROM ad_sploits WHERE id=?`, sploitID).Scan(&ownerTeam); err != nil {
-		jsonError(w, "not found", http.StatusNotFound)
-		return
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "not found"})
 	}
-	if ownerTeam != teamID && getUserRole(r) != "admin" {
-		jsonError(w, "forbidden", http.StatusForbidden)
-		return
+	if ownerTeam != teamID && getUserRole(c) != "admin" {
+		return c.JSON(http.StatusForbidden, map[string]string{"error": "forbidden"})
 	}
 	rows, err := s.db.Query(`
 		SELECT id, sploit_id, target_team_id, round, flags_captured, flags_submitted, error, ran_at
@@ -352,8 +326,7 @@ func (s *Server) handleADSploitResults(w http.ResponseWriter, r *http.Request) {
 		sploitID,
 	)
 	if err != nil {
-		jsonError(w, "db error", http.StatusInternalServerError)
-		return
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
 	}
 	defer rows.Close()
 	var results []models.SploitResult
@@ -368,27 +341,25 @@ func (s *Server) handleADSploitResults(w http.ResponseWriter, r *http.Request) {
 	if results == nil {
 		results = []models.SploitResult{}
 	}
-	jsonResponse(w, http.StatusOK, results)
+	return c.JSON(http.StatusOK, results)
 }
 
 // ────────────────────────────────────────────────────────────────────────────
 // Manual flag submission proxy (player submits a captured flag directly)
 // ────────────────────────────────────────────────────────────────────────────
 
-func (s *Server) handleADSubmitFlag(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleADSubmitFlag(c echo.Context) error {
 	var req struct {
 		Flags []string `json:"flags"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || len(req.Flags) == 0 {
-		jsonError(w, "provide flags array", http.StatusBadRequest)
-		return
+	if err := c.Bind(&req); err != nil || len(req.Flags) == 0 {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "provide flags array"})
 	}
 	if s.cfg.AD.FlagSubmitURL == "" {
-		jsonError(w, "central flag submitter not configured", http.StatusServiceUnavailable)
-		return
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "central flag submitter not configured"})
 	}
 	// Store as ad_flags for record-keeping
-	userID := getUserID(r)
+	userID := getUserID(c)
 	teamID := s.getTeamIDForUser(userID)
 	round := int64(0)
 	if s.adEngine != nil {
@@ -405,8 +376,7 @@ func (s *Server) handleADSubmitFlag(w http.ResponseWriter, r *http.Request) {
 	body, _ := json.Marshal(req.Flags)
 	httpReq, err := http.NewRequest(http.MethodPost, s.cfg.AD.FlagSubmitURL, jsonBody(body))
 	if err != nil {
-		jsonError(w, "failed to build request", http.StatusInternalServerError)
-		return
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to build request"})
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	if s.cfg.AD.FlagSubmitKey != "" {
@@ -416,12 +386,11 @@ func (s *Server) handleADSubmitFlag(w http.ResponseWriter, r *http.Request) {
 	client := &http.Client{}
 	resp, err := client.Do(httpReq)
 	if err != nil {
-		jsonError(w, "flag submitter unreachable: "+err.Error(), http.StatusBadGateway)
-		return
+		return c.JSON(http.StatusBadGateway, map[string]string{"error": "flag submitter unreachable: " + err.Error()})
 	}
 	defer resp.Body.Close()
-	jsonResponse(w, http.StatusOK, map[string]any{
-		"submitted": len(req.Flags),
+	return c.JSON(http.StatusOK, map[string]any{
+		"submitted":     len(req.Flags),
 		"server_status": resp.StatusCode,
 	})
 }

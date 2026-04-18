@@ -5,7 +5,7 @@
 | Layer | Technology | Notes |
 |-------|-----------|-------|
 | Language | [Go 1.21+](https://go.dev/) | Compiled, type-safe, high concurrency |
-| HTTP Router | [go-chi/chi v5](https://github.com/go-chi/chi) | Lightweight, idiomatic router with middleware support |
+| HTTP Router | [labstack/echo v4](https://github.com/labstack/echo) | High performance, extensible, minimalist web framework |
 | Auth | [golang-jwt/jwt v5](https://github.com/golang-jwt/jwt) | JWT tokens stored in HttpOnly cookies |
 | Passwords | [golang.org/x/crypto (bcrypt)](https://pkg.go.dev/golang.org/x/crypto/bcrypt) | Industry-standard password hashing |
 | Database | [modernc.org/sqlite](https://gitlab.com/cznic/sqlite) | Pure-Go SQLite — zero CGO, single binary |
@@ -57,6 +57,7 @@
 │                     REST API (Go / chi)                      │
 │  /api/auth  │  /api/challenges  │  /api/scoreboard          │
 │  JWT middleware  │  Rate limiter  │  Admin guard             │
+│  Instance management (start/stop/status)                    │
 └──────┬──────────────────────────────────┬───────────────────┘
        │                                  │
 ┌──────▼──────┐                  ┌────────▼────────┐

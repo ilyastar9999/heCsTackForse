@@ -2,13 +2,12 @@ package api
 
 import (
 	"bytes"
-	"encoding/json"
 	"io"
 	"net/http"
 	"time"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	"github.com/labstack/echo/v4"
+	echomw "github.com/labstack/echo/v4/middleware"
 
 	"github.com/ilyastar9999/heCsTackForse/internal/ad"
 	"github.com/ilyastar9999/heCsTackForse/internal/config"
@@ -21,105 +20,86 @@ type Server struct {
 	db          *db.DB
 	deployer    *deployer.Manager
 	adEngine    *ad.Engine
-	r           *chi.Mux
+	e           *echo.Echo
 	rateLimiter *rateLimiter
 }
 
 func NewServer(cfg *config.Config, database *db.DB, mgr *deployer.Manager, adEng *ad.Engine) *Server {
 	s := &Server{cfg: cfg, db: database, deployer: mgr, adEngine: adEng, rateLimiter: newRateLimiter()}
-	s.r = s.buildRouter()
+	s.e = s.buildRouter()
 	return s
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.r.ServeHTTP(w, r)
+	s.e.ServeHTTP(w, r)
 }
 
-func (s *Server) buildRouter() *chi.Mux {
-	r := chi.NewRouter()
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
-	r.Use(middleware.Compress(5))
+func (s *Server) buildRouter() *echo.Echo {
+	e := echo.New()
+	e.HideBanner = true
+	e.Use(echomw.Logger())
+	e.Use(echomw.Recover())
+	e.Use(echomw.GzipWithConfig(echomw.GzipConfig{Level: 5}))
 
 	// Serve frontend static files
-	fs := http.FileServer(http.Dir(s.cfg.Server.StaticDir))
-	r.Handle("/static/*", http.StripPrefix("/static", fs))
+	e.Static("/static", s.cfg.Server.StaticDir+"/static")
 
 	// Serve HTML pages
-	r.Get("/", serveFile(s.cfg.Server.StaticDir+"/index.html"))
-	r.Get("/login", serveFile(s.cfg.Server.StaticDir+"/login.html"))
-	r.Get("/register", serveFile(s.cfg.Server.StaticDir+"/register.html"))
-	r.Get("/scoreboard", serveFile(s.cfg.Server.StaticDir+"/scoreboard.html"))
-	r.Get("/challenges", serveFile(s.cfg.Server.StaticDir+"/challenges.html"))
-	r.Get("/profile", serveFile(s.cfg.Server.StaticDir+"/profile.html"))
-	r.Get("/admin", serveFile(s.cfg.Server.StaticDir+"/admin.html"))
-	r.Get("/ad", serveFile(s.cfg.Server.StaticDir+"/ad.html"))
+	sd := s.cfg.Server.StaticDir
+	e.GET("/", func(c echo.Context) error { return c.File(sd + "/index.html") })
+	e.GET("/login", func(c echo.Context) error { return c.File(sd + "/login.html") })
+	e.GET("/register", func(c echo.Context) error { return c.File(sd + "/register.html") })
+	e.GET("/scoreboard", func(c echo.Context) error { return c.File(sd + "/scoreboard.html") })
+	e.GET("/challenges", func(c echo.Context) error { return c.File(sd + "/challenges.html") })
+	e.GET("/profile", func(c echo.Context) error { return c.File(sd + "/profile.html") })
+	e.GET("/admin", func(c echo.Context) error { return c.File(sd + "/admin.html") })
+	e.GET("/ad", func(c echo.Context) error { return c.File(sd + "/ad.html") })
 
-	// API routes
-	r.Route("/api", func(r chi.Router) {
-		// Public
-		r.Post("/auth/register", s.handleRegister)
-		r.Post("/auth/login", s.handleLogin)
-		r.Get("/scoreboard", s.handleScoreboard)
+	// API routes — public
+	api := e.Group("/api")
+	api.POST("/auth/register", s.handleRegister)
+	api.POST("/auth/login", s.handleLogin)
+	api.GET("/scoreboard", s.handleScoreboard)
 
-		// Authenticated
-		r.Group(func(r chi.Router) {
-			r.Use(s.authMiddleware)
-			r.Post("/auth/logout", s.handleLogout)
-			r.Get("/auth/me", s.handleMe)
+	// Authenticated
+	auth := api.Group("", s.authMiddleware)
+	auth.POST("/auth/logout", s.handleLogout)
+	auth.GET("/auth/me", s.handleMe)
 
-			r.Get("/challenges", s.handleListChallenges)
-			r.Get("/challenges/{id}", s.handleGetChallenge)
-			r.With(s.rateLimitMiddleware(10, time.Minute)).Post("/challenges/{id}/submit", s.handleSubmitFlag)
+	auth.GET("/challenges", s.handleListChallenges)
+	auth.GET("/challenges/:id", s.handleGetChallenge)
+	auth.POST("/challenges/:id/submit", s.handleSubmitFlag, s.rateLimitMiddleware(10, time.Minute))
+	auth.GET("/challenges/:id/instance", s.handleGetInstance)
+	auth.POST("/challenges/:id/instance", s.handleStartInstance)
+	auth.DELETE("/challenges/:id/instance", s.handleStopInstance)
 
-			r.Get("/users/{id}", s.handleGetUser)
-			r.Post("/teams", s.handleCreateTeam)
-			r.Post("/teams/join", s.handleJoinTeam)
-			r.Get("/teams/{id}", s.handleGetTeam)
+	auth.GET("/users/:id", s.handleGetUser)
+	auth.POST("/teams", s.handleCreateTeam)
+	auth.POST("/teams/join", s.handleJoinTeam)
+	auth.GET("/teams/:id", s.handleGetTeam)
 
-			// Attack & Defence
-			r.Get("/ad/status", s.handleADStatus)
-			r.Get("/ad/scoreboard", s.handleADScoreboard)
-			r.Get("/ad/services", s.handleADServices)
-			r.Get("/ad/vpn", s.handleADGetVPN)
-			r.Get("/ad/sploits", s.handleADListSploits)
-			r.Post("/ad/sploits", s.handleADCreateSploit)
-			r.Put("/ad/sploits/{id}", s.handleADUpdateSploit)
-			r.Delete("/ad/sploits/{id}", s.handleADDeleteSploit)
-			r.Get("/ad/sploits/{id}/results", s.handleADSploitResults)
-			r.With(s.rateLimitMiddleware(20, 60*time.Second)).Post("/ad/flags/submit", s.handleADSubmitFlag)
-		})
+	// Attack & Defence
+	auth.GET("/ad/status", s.handleADStatus)
+	auth.GET("/ad/scoreboard", s.handleADScoreboard)
+	auth.GET("/ad/services", s.handleADServices)
+	auth.GET("/ad/vpn", s.handleADGetVPN)
+	auth.GET("/ad/sploits", s.handleADListSploits)
+	auth.POST("/ad/sploits", s.handleADCreateSploit)
+	auth.PUT("/ad/sploits/:id", s.handleADUpdateSploit)
+	auth.DELETE("/ad/sploits/:id", s.handleADDeleteSploit)
+	auth.GET("/ad/sploits/:id/results", s.handleADSploitResults)
+	auth.POST("/ad/flags/submit", s.handleADSubmitFlag, s.rateLimitMiddleware(20, 60*time.Second))
 
-		// Admin
-		r.Group(func(r chi.Router) {
-			r.Use(s.authMiddleware)
-			r.Use(s.adminMiddleware)
-			r.Get("/admin/challenges", s.handleAdminListChallenges)
-			r.Post("/admin/challenges", s.handleAdminCreateChallenge)
-			r.Put("/admin/challenges/{id}", s.handleAdminUpdateChallenge)
-			r.Delete("/admin/challenges/{id}", s.handleAdminDeleteChallenge)
-			r.Get("/admin/users", s.handleAdminListUsers)
-			r.Put("/admin/users/{id}", s.handleAdminUpdateUser)
-		})
-	})
+	// Admin
+	admin := api.Group("/admin", s.authMiddleware, s.adminMiddleware)
+	admin.GET("/challenges", s.handleAdminListChallenges)
+	admin.POST("/challenges", s.handleAdminCreateChallenge)
+	admin.PUT("/challenges/:id", s.handleAdminUpdateChallenge)
+	admin.DELETE("/challenges/:id", s.handleAdminDeleteChallenge)
+	admin.GET("/users", s.handleAdminListUsers)
+	admin.PUT("/users/:id", s.handleAdminUpdateUser)
 
-	return r
-}
-
-func serveFile(path string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, path)
-	}
-}
-
-func jsonResponse(w http.ResponseWriter, status int, data any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(data)
-}
-
-func jsonError(w http.ResponseWriter, msg string, status int) {
-	jsonResponse(w, status, map[string]string{"error": msg})
+	return e
 }
 
 // jsonBody wraps a byte slice as an io.Reader (avoids importing bytes in ad.go).

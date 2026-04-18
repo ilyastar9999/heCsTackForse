@@ -1,38 +1,34 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v4"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/ilyastar9999/heCsTackForse/internal/models"
 )
 
-func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleRegister(c echo.Context) error {
 	if !s.cfg.CTF.RegistrationOpen {
-		jsonError(w, "registration is closed", http.StatusForbidden)
-		return
+		return c.JSON(http.StatusForbidden, map[string]string{"error": "registration is closed"})
 	}
 	var req struct {
 		Username string `json:"username"`
 		Email    string `json:"email"`
 		Password string `json:"password"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		jsonError(w, "invalid request", http.StatusBadRequest)
-		return
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
 	}
 	if req.Username == "" || req.Email == "" || req.Password == "" {
-		jsonError(w, "username, email, and password are required", http.StatusBadRequest)
-		return
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "username, email, and password are required"})
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		jsonError(w, "internal error", http.StatusInternalServerError)
-		return
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "internal error"})
 	}
 	role := "user"
 	// Make first user admin
@@ -46,8 +42,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		req.Username, req.Email, string(hash), role,
 	)
 	if err != nil {
-		jsonError(w, "username or email already exists", http.StatusConflict)
-		return
+		return c.JSON(http.StatusConflict, map[string]string{"error": "username or email already exists"})
 	}
 	user := &models.User{
 		ID:       id,
@@ -57,23 +52,22 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 	token, err := s.generateToken(user)
 	if err != nil {
-		jsonError(w, "internal error", http.StatusInternalServerError)
-		return
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "internal error"})
 	}
-	jsonResponse(w, http.StatusCreated, map[string]any{
+	setAuthCookie(c, token)
+	return c.JSON(http.StatusCreated, map[string]any{
 		"token": token,
 		"user":  user,
 	})
 }
 
-func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleLogin(c echo.Context) error {
 	var req struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		jsonError(w, "invalid request", http.StatusBadRequest)
-		return
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
 	}
 	var user models.User
 	err := s.db.QueryRow(
@@ -81,56 +75,45 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		req.Username,
 	).Scan(&user.ID, &user.Username, &user.Email, &user.PasswordHash, &user.Role, &user.Score, &user.CreatedAt)
 	if err != nil {
-		jsonError(w, "invalid credentials", http.StatusUnauthorized)
-		return
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid credentials"})
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
-		jsonError(w, "invalid credentials", http.StatusUnauthorized)
-		return
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid credentials"})
 	}
 	token, err := s.generateToken(&user)
 	if err != nil {
-		jsonError(w, "internal error", http.StatusInternalServerError)
-		return
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "internal error"})
 	}
-	http.SetCookie(w, &http.Cookie{
-		Name:     "token",
-		Value:    token,
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   r.TLS != nil,
-		SameSite: http.SameSiteLaxMode,
-	})
-	jsonResponse(w, http.StatusOK, map[string]any{
+	setAuthCookie(c, token)
+	return c.JSON(http.StatusOK, map[string]any{
 		"token": token,
 		"user":  user,
 	})
 }
 
-func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
-	userID := getUserID(r)
+func (s *Server) handleMe(c echo.Context) error {
+	userID := getUserID(c)
 	var user models.User
 	err := s.db.QueryRow(
 		"SELECT id, username, email, role, score, created_at FROM users WHERE id = ?",
 		userID,
 	).Scan(&user.ID, &user.Username, &user.Email, &user.Role, &user.Score, &user.CreatedAt)
 	if err != nil {
-		jsonError(w, "user not found", http.StatusNotFound)
-		return
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "user not found"})
 	}
-	jsonResponse(w, http.StatusOK, user)
+	return c.JSON(http.StatusOK, user)
 }
 
-func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
-	http.SetCookie(w, &http.Cookie{
+func (s *Server) handleLogout(c echo.Context) error {
+	http.SetCookie(c.Response(), &http.Cookie{
 		Name:     "token",
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
-		Secure:   r.TLS != nil,
+		Secure:   c.Request().TLS != nil,
 	})
-	jsonResponse(w, http.StatusOK, map[string]string{"message": "logged out"})
+	return c.JSON(http.StatusOK, map[string]string{"message": "logged out"})
 }
 
 func (s *Server) generateToken(user *models.User) (string, error) {
@@ -141,4 +124,15 @@ func (s *Server) generateToken(user *models.User) (string, error) {
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(s.cfg.Server.SecretKey))
+}
+
+func setAuthCookie(c echo.Context, token string) {
+	http.SetCookie(c.Response(), &http.Cookie{
+		Name:     "token",
+		Value:    token,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   c.Request().TLS != nil,
+		SameSite: http.SameSiteLaxMode,
+	})
 }
