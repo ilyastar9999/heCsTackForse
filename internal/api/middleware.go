@@ -43,6 +43,14 @@ func (s *Server) authMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 		role, _ := claims["role"].(string)
 		c.Set(userIDKey, int64(userID.(float64)))
 		c.Set(userRoleKey, role)
+
+		// Deny access to banned users (DB check; fast because id is PK-indexed).
+		var banned bool
+		_ = s.db.QueryRow("SELECT COALESCE(banned, 0) FROM users WHERE id=?", int64(userID.(float64))).Scan(&banned)
+		if banned {
+			return c.JSON(http.StatusForbidden, map[string]string{"error": "your account has been banned"})
+		}
+
 		return next(c)
 	}
 }

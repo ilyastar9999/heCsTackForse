@@ -13,6 +13,7 @@ import (
 	"github.com/ilyastar9999/heCsTackForse/internal/config"
 	"github.com/ilyastar9999/heCsTackForse/internal/db"
 	"github.com/ilyastar9999/heCsTackForse/internal/deployer"
+	"github.com/ilyastar9999/heCsTackForse/internal/plugin"
 )
 
 type Server struct {
@@ -60,11 +61,15 @@ func (s *Server) buildRouter() *echo.Echo {
 	api.POST("/auth/register", s.handleRegister)
 	api.POST("/auth/login", s.handleLogin)
 	api.GET("/scoreboard", s.handleScoreboard)
+	api.GET("/config", s.handleConfig)
+	api.GET("/plugins", s.handlePlugins)
 
 	// Authenticated
 	auth := api.Group("", s.authMiddleware)
 	auth.POST("/auth/logout", s.handleLogout)
 	auth.GET("/auth/me", s.handleMe)
+	auth.PUT("/auth/me", s.handleUpdateMe)
+	auth.PUT("/auth/me/password", s.handleChangePassword)
 
 	auth.GET("/challenges", s.handleListChallenges)
 	auth.GET("/challenges/:id", s.handleGetChallenge)
@@ -98,6 +103,8 @@ func (s *Server) buildRouter() *echo.Echo {
 	admin.DELETE("/challenges/:id", s.handleAdminDeleteChallenge)
 	admin.GET("/users", s.handleAdminListUsers)
 	admin.PUT("/users/:id", s.handleAdminUpdateUser)
+	admin.DELETE("/users/:id", s.handleAdminDeleteUser)
+	admin.POST("/users/:id/reset_score", s.handleAdminResetScore)
 
 	return e
 }
@@ -105,4 +112,27 @@ func (s *Server) buildRouter() *echo.Echo {
 // jsonBody wraps a byte slice as an io.Reader (avoids importing bytes in ad.go).
 func jsonBody(b []byte) io.Reader {
 	return bytes.NewReader(b)
+}
+
+// handleConfig returns public CTF configuration so the frontend can adapt.
+func (s *Server) handleConfig(c echo.Context) error {
+	return c.JSON(http.StatusOK, map[string]any{
+		"name":              s.cfg.CTF.Name,
+		"mode":              s.cfg.CTF.Mode,
+		"team_mode":         s.cfg.CTF.TeamMode,
+		"scoring":           s.cfg.CTF.Scoring,
+		"flag_prefix":       s.cfg.CTF.FlagPrefix,
+		"flag_suffix":       s.cfg.CTF.FlagSuffix,
+		"registration_open": s.cfg.CTF.RegistrationOpen,
+		"language":          s.cfg.CTF.Language,
+	})
+}
+
+// handlePlugins returns the names of all plugins registered in the Default registry.
+func (s *Server) handlePlugins(c echo.Context) error {
+	return c.JSON(http.StatusOK, map[string]any{
+		"scorers":       plugin.Default.ScorerNames(),
+		"flag_checkers": plugin.Default.FlagCheckerNames(),
+		"notifiers":     plugin.Default.NotifierNames(),
+	})
 }

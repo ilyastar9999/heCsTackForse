@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
-	"regexp"
 	"strconv"
 
 	"github.com/labstack/echo/v4"
@@ -109,13 +108,11 @@ func (s *Server) handleSubmitFlag(c echo.Context) error {
 	ch := &models.Challenge{Points: points}
 	awardedPoints := s.scoreChallenge(ch, solveCount)
 
-	var isCorrect bool
-	if flagType == "regex" {
-		re, err := regexp.Compile(correctFlag)
-		isCorrect = err == nil && re.MatchString(req.Flag)
-	} else {
-		isCorrect = req.Flag == correctFlag
+	checker, _ := plugin.Default.GetFlagChecker(flagType)
+	if checker == nil {
+		checker, _ = plugin.Default.GetFlagChecker("exact")
 	}
+	isCorrect := checker.Check(correctFlag, req.Flag)
 	ip := getClientIP(c)
 
 	if _, err := s.db.Exec(

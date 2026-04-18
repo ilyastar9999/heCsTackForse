@@ -35,6 +35,7 @@ type CTFConfig struct {
 	FlagPrefix       string `yaml:"flag_prefix"`
 	FlagSuffix       string `yaml:"flag_suffix"`
 	SeedChallenges   bool   `yaml:"seed_challenges"`
+	Language         string `yaml:"language"` // default UI language: "en", "ru", …
 }
 
 type DeployerConfig struct {
@@ -109,6 +110,7 @@ func Load(path string) (*Config, error) {
 	cfg.CTF.FlagPrefix = "FLAG{"
 	cfg.CTF.FlagSuffix = "}"
 	cfg.CTF.SeedChallenges = true
+	cfg.CTF.Language = "en"
 	cfg.Deployer.InstanceTTL = "4h"
 	cfg.AD.RoundDuration = "5m"
 	cfg.AD.FlagLifetime = 2

@@ -1,3 +1,14 @@
+// Package plugin defines the core plugin interfaces for heCsTackForse and
+// provides built-in implementations for scoring and flag checking.
+//
+// # Plugin types
+//
+//   - [Scorer]       – calculates points awarded for solving a challenge.
+//   - [FlagChecker]  – determines whether a submitted flag is correct.
+//   - [Notifier]     – dispatches events (e.g. Slack/webhook notifications).
+//
+// All plugins are registered in the process-wide [Default] registry.
+// Third-party plugins should call Default.Register* inside their own init().
 package plugin
 
 import (
@@ -6,21 +17,30 @@ import (
 	"github.com/ilyastar9999/heCsTackForse/internal/models"
 )
 
+// Plugin is the base interface that every plugin must satisfy.
 type Plugin interface {
+	// Name returns the unique identifier used to look up the plugin in the registry.
 	Name() string
+	// Init is called once after registration, passing any key-value settings
+	// from the config file.  Return an error to abort startup.
 	Init(cfg map[string]any) error
 }
 
+// Event carries a typed payload dispatched to Notifier plugins.
 type Event struct {
 	Type string
 	Data map[string]any
 }
 
+// Scorer calculates the points awarded to a user for solving a challenge.
+// Register custom implementations via Default.RegisterScorer().
 type Scorer interface {
 	Plugin
 	CalculateScore(challenge *models.Challenge, solveCount int) int
 }
 
+// Notifier receives platform events and forwards them to external systems
+// (e.g. Slack, Discord, webhooks).
 type Notifier interface {
 	Plugin
 	Notify(event Event) error

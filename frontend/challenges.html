@@ -16,24 +16,31 @@
       </button>
       <div class="collapse navbar-collapse" id="navMenu">
         <ul class="navbar-nav me-auto">
-          <li class="nav-item"><a class="nav-link active" href="/challenges">Challenges</a></li>
-          <li class="nav-item"><a class="nav-link" href="/scoreboard">Scoreboard</a></li>
+          <li class="nav-item"><a class="nav-link active" data-i18n="nav.challenges" href="/challenges">Challenges</a></li>
+          <li class="nav-item"><a class="nav-link" data-i18n="nav.scoreboard" href="/scoreboard">Scoreboard</a></li>
         </ul>
         <ul class="navbar-nav ms-auto">
-          <li class="nav-item" id="nav-admin" style="display:none"><a class="nav-link" href="/admin">Admin</a></li>
+          <li class="nav-item" id="nav-admin" style="display:none"><a class="nav-link" data-i18n="nav.admin" href="/admin">Admin</a></li>
           <li class="nav-item" id="nav-profile-li" style="display:none"><a class="nav-link" href="/profile" id="nav-profile">Profile</a></li>
-          <li class="nav-item" id="nav-logout-li" style="display:none"><a class="nav-link" href="#" onclick="logout()">Logout</a></li>
+          <li class="nav-item" id="nav-logout-li" style="display:none"><a class="nav-link" data-i18n="nav.logout" href="#" onclick="logout()">Logout</a></li>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown"><span id="lang-toggle-label">EN</span></a>
+            <ul class="dropdown-menu dropdown-menu-end" style="min-width:120px">
+              <li><a class="dropdown-item" href="#" onclick="setLang('en');return false">English</a></li>
+              <li><a class="dropdown-item" href="#" onclick="setLang('ru');return false">Русский</a></li>
+            </ul>
+          </li>
         </ul>
       </div>
     </div>
   </nav>
 
   <div class="page-container">
-    <h1 class="page-title">Challenges</h1>
+    <h1 class="page-title" data-i18n="challenges.title">Challenges</h1>
     <div id="categories">
       <div class="loading-spinner">
         <div class="spinner-border text-secondary" role="status"></div>
-        <p class="mt-2">Loading challenges…</p>
+        <p class="mt-2" data-i18n="challenges.loading">Loading challenges…</p>
       </div>
     </div>
   </div>
@@ -52,13 +59,13 @@
         <div class="modal-body">
           <div id="modal-desc" class="mb-3" style="white-space:pre-wrap;color:var(--ctf-text)"></div>
           <div id="modal-instance" class="d-none mb-3"></div>
-          <div id="modal-solved-notice" class="alert alert-success d-none">✓ You already solved this challenge!</div>
+          <div id="modal-solved-notice" class="alert alert-success d-none" data-i18n="challenges.solved_notice">✓ You already solved this challenge!</div>
           <form id="flag-form" onsubmit="submitFlag(event)">
             <div class="mb-2">
               <label class="form-label">Flag</label>
               <div class="input-group">
-                <input type="text" class="form-control" id="flag-input" placeholder="FLAG{...}" autocomplete="off">
-                <button type="submit" class="btn btn-primary" id="submit-btn">Submit</button>
+                <input type="text" class="form-control" id="flag-input" data-i18n-placeholder="challenges.flag_placeholder" placeholder="FLAG{...}" autocomplete="off">
+                <button type="submit" class="btn btn-primary" id="submit-btn" data-i18n="challenges.submit">Submit</button>
               </div>
             </div>
             <div id="flag-error" class="alert alert-danger d-none mt-2"></div>
@@ -74,7 +81,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="/static/js/api.js"></script>
-  <script src="/static/js/marked.min.js"></script>
+  <script src="/static/js/i18n.js"></script>
   <script src="/static/js/challenges.js"></script>
   <script>
     async function logout() {
@@ -82,6 +89,7 @@
       location.href = '/login';
     }
     (async () => {
+      await initI18n();
       const user = await getMe();
       if (!user) { location.href = '/login'; return; }
       document.getElementById('nav-profile').textContent = user.username;

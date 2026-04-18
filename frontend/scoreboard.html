@@ -16,31 +16,38 @@
       </button>
       <div class="collapse navbar-collapse" id="navMenu">
         <ul class="navbar-nav me-auto">
-          <li class="nav-item"><a class="nav-link" href="/challenges">Challenges</a></li>
-          <li class="nav-item"><a class="nav-link active" href="/scoreboard">Scoreboard</a></li>
+          <li class="nav-item"><a class="nav-link" data-i18n="nav.challenges" href="/challenges">Challenges</a></li>
+          <li class="nav-item"><a class="nav-link active" data-i18n="nav.scoreboard" href="/scoreboard">Scoreboard</a></li>
         </ul>
         <ul class="navbar-nav ms-auto">
-          <li class="nav-item" id="nav-admin" style="display:none"><a class="nav-link" href="/admin">Admin</a></li>
+          <li class="nav-item" id="nav-admin" style="display:none"><a class="nav-link" data-i18n="nav.admin" href="/admin">Admin</a></li>
           <li class="nav-item" id="nav-profile-li" style="display:none"><a class="nav-link" href="/profile" id="nav-profile">Profile</a></li>
-          <li class="nav-item" id="nav-login-li"><a class="nav-link" href="/login">Login</a></li>
-          <li class="nav-item" id="nav-register-li"><a class="nav-link" href="/register">Register</a></li>
-          <li class="nav-item" id="nav-logout-li" style="display:none"><a class="nav-link" href="#" onclick="logout()">Logout</a></li>
+          <li class="nav-item" id="nav-login-li"><a class="nav-link" data-i18n="nav.login" href="/login">Login</a></li>
+          <li class="nav-item" id="nav-register-li"><a class="nav-link" data-i18n="nav.register" href="/register">Register</a></li>
+          <li class="nav-item" id="nav-logout-li" style="display:none"><a class="nav-link" data-i18n="nav.logout" href="#" onclick="logout()">Logout</a></li>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown"><span id="lang-toggle-label">EN</span></a>
+            <ul class="dropdown-menu dropdown-menu-end" style="min-width:120px">
+              <li><a class="dropdown-item" href="#" onclick="setLang('en');return false">English</a></li>
+              <li><a class="dropdown-item" href="#" onclick="setLang('ru');return false">Русский</a></li>
+            </ul>
+          </li>
         </ul>
       </div>
     </div>
   </nav>
 
   <div class="page-container">
-    <h1 class="page-title">Scoreboard</h1>
+    <h1 class="page-title" data-i18n="scoreboard.title">Scoreboard</h1>
     <div class="card">
       <div class="card-body p-0">
         <table class="scoreboard-table">
           <thead>
             <tr>
-              <th style="width:60px">#</th>
-              <th>Name</th>
-              <th style="width:100px">Solves</th>
-              <th style="width:120px">Score</th>
+              <th style="width:60px" data-i18n="scoreboard.rank">#</th>
+              <th data-i18n="scoreboard.player">Name</th>
+              <th style="width:100px" data-i18n="scoreboard.solves">Solves</th>
+              <th style="width:120px" data-i18n="scoreboard.score">Score</th>
             </tr>
           </thead>
           <tbody id="scoreboard-body">
@@ -53,6 +60,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="/static/js/api.js"></script>
+  <script src="/static/js/i18n.js"></script>
   <script src="/static/js/scoreboard.js"></script>
   <script>
     async function logout() {
@@ -60,6 +68,7 @@
       location.reload();
     }
     (async () => {
+      await initI18n();
       const user = await getMe();
       if (user) {
         document.getElementById('nav-profile').textContent = user.username;

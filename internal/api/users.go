@@ -97,7 +97,7 @@ func (s *Server) handleGetTeam(c echo.Context) error {
 }
 
 func (s *Server) handleAdminListUsers(c echo.Context) error {
-	rows, err := s.db.Query("SELECT id, username, email, role, score, created_at FROM users ORDER BY id")
+	rows, err := s.db.Query("SELECT id, username, email, role, score, affiliation, website, country, banned, created_at FROM users ORDER BY id")
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
 	}
@@ -105,7 +105,8 @@ func (s *Server) handleAdminListUsers(c echo.Context) error {
 	var users []models.User
 	for rows.Next() {
 		var u models.User
-		if err := rows.Scan(&u.ID, &u.Username, &u.Email, &u.Role, &u.Score, &u.CreatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.Email, &u.Role, &u.Score,
+			&u.Affiliation, &u.Website, &u.Country, &u.Banned, &u.CreatedAt); err != nil {
 			continue
 		}
 		users = append(users, u)
@@ -122,17 +123,63 @@ func (s *Server) handleAdminUpdateUser(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid id"})
 	}
 	var req struct {
-		Role  string `json:"role"`
-		Score int    `json:"score"`
+		Role   string `json:"role"`
+		Score  int    `json:"score"`
+		Banned *bool  `json:"banned"`
+		Email  string `json:"email"`
 	}
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
 	}
-	_, err = s.db.Exec("UPDATE users SET role=?, score=? WHERE id=?", req.Role, req.Score, id)
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
+	if req.Banned != nil {
+		if _, err := s.db.Exec("UPDATE users SET banned=? WHERE id=?", *req.Banned, id); err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
+		}
+	}
+	if req.Email != "" {
+		if _, err := s.db.Exec("UPDATE users SET email=? WHERE id=?", req.Email, id); err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
+		}
+	}
+	if req.Role != "" {
+		if _, err := s.db.Exec("UPDATE users SET role=?, score=? WHERE id=?", req.Role, req.Score, id); err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
+		}
 	}
 	return c.JSON(http.StatusOK, map[string]string{"message": "updated"})
+}
+
+// handleAdminDeleteUser permanently removes a user and all their submissions.
+func (s *Server) handleAdminDeleteUser(c echo.Context) error {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid id"})
+	}
+	if _, err := s.db.Exec("DELETE FROM submissions WHERE user_id=?", id); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
+	}
+	if _, err := s.db.Exec("DELETE FROM team_members WHERE user_id=?", id); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
+	}
+	if _, err := s.db.Exec("DELETE FROM users WHERE id=?", id); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
+	}
+	return c.JSON(http.StatusOK, map[string]string{"message": "deleted"})
+}
+
+// handleAdminResetScore sets a user's score to 0 and deletes all their submissions.
+func (s *Server) handleAdminResetScore(c echo.Context) error {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid id"})
+	}
+	if _, err := s.db.Exec("DELETE FROM submissions WHERE user_id=?", id); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
+	}
+	if _, err := s.db.Exec("UPDATE users SET score=0 WHERE id=?", id); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
+	}
+	return c.JSON(http.StatusOK, map[string]string{"message": "score reset"})
 }
 
 func generateInviteCode() (string, error) {

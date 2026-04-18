@@ -1,7 +1,10 @@
 package db
 
-// Migrate creates all required tables, using the correct DDL dialect for the
-// configured database driver.
+import "strings"
+
+// Migrate creates all required tables and runs additive ALTER TABLE migrations.
+// ALTER TABLE errors for columns that already exist are silently ignored so
+// that the function is safe to call on both fresh and existing databases.
 func (d *DB) Migrate() error {
 	var queries []string
 	if d.IsPostgres() {
@@ -11,6 +14,17 @@ func (d *DB) Migrate() error {
 	}
 	for _, q := range queries {
 		if _, err := d.DB.Exec(q); err != nil {
+			// Gracefully ignore "column already exists" when running ALTER TABLE
+			// against a database that was created before these columns were added.
+			trimmed := strings.TrimSpace(strings.ToUpper(q))
+			if strings.HasPrefix(trimmed, "ALTER TABLE") {
+				msg := strings.ToLower(err.Error())
+				if strings.Contains(msg, "duplicate column") ||
+					strings.Contains(msg, "already exists") ||
+					strings.Contains(msg, "column already exists") {
+					continue
+				}
+			}
 			return err
 		}
 	}
@@ -27,6 +41,10 @@ var sqliteMigrations = []string{
 		password_hash TEXT NOT NULL,
 		role TEXT NOT NULL DEFAULT 'user',
 		score INTEGER NOT NULL DEFAULT 0,
+		affiliation TEXT NOT NULL DEFAULT '',
+		website TEXT NOT NULL DEFAULT '',
+		country TEXT NOT NULL DEFAULT '',
+		banned INTEGER NOT NULL DEFAULT 0,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	)`,
 	`CREATE TABLE IF NOT EXISTS teams (
@@ -143,6 +161,12 @@ var sqliteMigrations = []string{
 		started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		finished_at DATETIME
 	)`,
+	// Additive migrations for existing SQLite databases.
+	// ALTER TABLE errors for already-existing columns are ignored by Migrate().
+	`ALTER TABLE users ADD COLUMN affiliation TEXT NOT NULL DEFAULT ''`,
+	`ALTER TABLE users ADD COLUMN website TEXT NOT NULL DEFAULT ''`,
+	`ALTER TABLE users ADD COLUMN country TEXT NOT NULL DEFAULT ''`,
+	`ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0`,
 }
 
 // postgresMigrations uses PostgreSQL types (BIGSERIAL, TIMESTAMPTZ, BOOLEAN).
@@ -154,6 +178,10 @@ var postgresMigrations = []string{
 		password_hash TEXT NOT NULL,
 		role TEXT NOT NULL DEFAULT 'user',
 		score INTEGER NOT NULL DEFAULT 0,
+		affiliation TEXT NOT NULL DEFAULT '',
+		website TEXT NOT NULL DEFAULT '',
+		country TEXT NOT NULL DEFAULT '',
+		banned BOOLEAN NOT NULL DEFAULT FALSE,
 		created_at TIMESTAMPTZ DEFAULT NOW()
 	)`,
 	`CREATE TABLE IF NOT EXISTS teams (
@@ -270,4 +298,9 @@ var postgresMigrations = []string{
 		started_at TIMESTAMPTZ DEFAULT NOW(),
 		finished_at TIMESTAMPTZ
 	)`,
+	// Additive migrations for existing PostgreSQL databases.
+	`ALTER TABLE users ADD COLUMN IF NOT EXISTS affiliation TEXT NOT NULL DEFAULT ''`,
+	`ALTER TABLE users ADD COLUMN IF NOT EXISTS website TEXT NOT NULL DEFAULT ''`,
+	`ALTER TABLE users ADD COLUMN IF NOT EXISTS country TEXT NOT NULL DEFAULT ''`,
+	`ALTER TABLE users ADD COLUMN IF NOT EXISTS banned BOOLEAN NOT NULL DEFAULT FALSE`,
 }
