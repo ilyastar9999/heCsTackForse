@@ -8,10 +8,11 @@ import (
 // Registry holds all registered plugin implementations keyed by their Name().
 // Plugins are safe for concurrent use after registration.
 type Registry struct {
-	mu           sync.RWMutex
-	scorers      map[string]Scorer
-	flagCheckers map[string]FlagChecker
-	notifiers    map[string]Notifier
+	mu             sync.RWMutex
+	scorers        map[string]Scorer
+	flagCheckers   map[string]FlagChecker
+	notifiers      map[string]Notifier
+	challengeTypes map[string]ChallengeTypeExtension
 }
 
 // Default is the process-wide plugin registry.
@@ -21,9 +22,10 @@ var Default = newRegistry()
 
 func newRegistry() *Registry {
 	return &Registry{
-		scorers:      make(map[string]Scorer),
-		flagCheckers: make(map[string]FlagChecker),
-		notifiers:    make(map[string]Notifier),
+		scorers:        make(map[string]Scorer),
+		flagCheckers:   make(map[string]FlagChecker),
+		notifiers:      make(map[string]Notifier),
+		challengeTypes: make(map[string]ChallengeTypeExtension),
 	}
 }
 
@@ -131,6 +133,37 @@ func (r *Registry) NotifierNames() []string {
 	defer r.mu.RUnlock()
 	names := make([]string, 0, len(r.notifiers))
 	for n := range r.notifiers {
+		names = append(names, n)
+	}
+	return names
+}
+
+// ─── ChallengeTypeExtension ───────────────────────────────────────────────────
+
+// RegisterChallengeType adds or replaces a ChallengeTypeExtension. Safe for concurrent use.
+func (r *Registry) RegisterChallengeType(ext ChallengeTypeExtension) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.challengeTypes[ext.TypeID()] = ext
+}
+
+// GetChallengeType retrieves a ChallengeTypeExtension by name, returning an error if not found.
+func (r *Registry) GetChallengeType(name string) (ChallengeTypeExtension, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	ext, ok := r.challengeTypes[name]
+	if !ok {
+		return nil, fmt.Errorf("challenge type %q not registered", name)
+	}
+	return ext, nil
+}
+
+// ChallengeTypeNames returns the names of all registered challenge types.
+func (r *Registry) ChallengeTypeNames() []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	names := make([]string, 0, len(r.challengeTypes))
+	for n := range r.challengeTypes {
 		names = append(names, n)
 	}
 	return names

@@ -161,12 +161,82 @@ var sqliteMigrations = []string{
 		started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		finished_at DATETIME
 	)`,
+	`CREATE TABLE IF NOT EXISTS notifications (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		title TEXT NOT NULL,
+		content TEXT NOT NULL DEFAULT '',
+		created_by INTEGER NOT NULL DEFAULT 0,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	)`,
+	`CREATE TABLE IF NOT EXISTS pages (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		title TEXT NOT NULL,
+		slug TEXT UNIQUE NOT NULL,
+		content TEXT NOT NULL DEFAULT '',
+		draft INTEGER NOT NULL DEFAULT 0,
+		auth_required INTEGER NOT NULL DEFAULT 0,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	)`,
+	`CREATE TABLE IF NOT EXISTS challenge_flags (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		challenge_id INTEGER NOT NULL,
+		content TEXT NOT NULL,
+		type TEXT NOT NULL DEFAULT 'exact',
+		data TEXT NOT NULL DEFAULT '',
+		FOREIGN KEY (challenge_id) REFERENCES challenges(id)
+	)`,
+	`CREATE TABLE IF NOT EXISTS challenge_files (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		challenge_id INTEGER NOT NULL,
+		name TEXT NOT NULL,
+		location TEXT NOT NULL,
+		size INTEGER NOT NULL DEFAULT 0,
+		FOREIGN KEY (challenge_id) REFERENCES challenges(id)
+	)`,
+	`CREATE TABLE IF NOT EXISTS challenge_hints (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		challenge_id INTEGER NOT NULL,
+		content TEXT NOT NULL,
+		cost INTEGER NOT NULL DEFAULT 0,
+		sort_order INTEGER NOT NULL DEFAULT 0,
+		FOREIGN KEY (challenge_id) REFERENCES challenges(id)
+	)`,
+	`CREATE TABLE IF NOT EXISTS challenge_tags (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		challenge_id INTEGER NOT NULL,
+		tag TEXT NOT NULL
+	)`,
+	`CREATE TABLE IF NOT EXISTS user_fields (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT UNIQUE NOT NULL,
+		field_type TEXT NOT NULL DEFAULT 'text',
+		required INTEGER NOT NULL DEFAULT 0,
+		public INTEGER NOT NULL DEFAULT 1,
+		description TEXT NOT NULL DEFAULT ''
+	)`,
+	`CREATE TABLE IF NOT EXISTS user_field_values (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		user_id INTEGER NOT NULL,
+		field_id INTEGER NOT NULL,
+		value TEXT NOT NULL DEFAULT '',
+		UNIQUE(user_id, field_id)
+	)`,
+	`CREATE TABLE IF NOT EXISTS ctf_settings (
+		key TEXT PRIMARY KEY,
+		value TEXT NOT NULL DEFAULT ''
+	)`,
 	// Additive migrations for existing SQLite databases.
 	// ALTER TABLE errors for already-existing columns are ignored by Migrate().
 	`ALTER TABLE users ADD COLUMN affiliation TEXT NOT NULL DEFAULT ''`,
 	`ALTER TABLE users ADD COLUMN website TEXT NOT NULL DEFAULT ''`,
 	`ALTER TABLE users ADD COLUMN country TEXT NOT NULL DEFAULT ''`,
 	`ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0`,
+	`ALTER TABLE users ADD COLUMN verified INTEGER NOT NULL DEFAULT 0`,
+	`ALTER TABLE users ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0`,
+	`ALTER TABLE users ADD COLUMN language TEXT NOT NULL DEFAULT ''`,
+	`ALTER TABLE challenges ADD COLUMN connection_info TEXT NOT NULL DEFAULT ''`,
+	`ALTER TABLE challenges ADD COLUMN max_attempts INTEGER NOT NULL DEFAULT 0`,
 }
 
 // postgresMigrations uses PostgreSQL types (BIGSERIAL, TIMESTAMPTZ, BOOLEAN).
@@ -298,9 +368,79 @@ var postgresMigrations = []string{
 		started_at TIMESTAMPTZ DEFAULT NOW(),
 		finished_at TIMESTAMPTZ
 	)`,
+	`CREATE TABLE IF NOT EXISTS notifications (
+		id BIGSERIAL PRIMARY KEY,
+		title TEXT NOT NULL,
+		content TEXT NOT NULL DEFAULT '',
+		created_by BIGINT NOT NULL DEFAULT 0,
+		created_at TIMESTAMPTZ DEFAULT NOW()
+	)`,
+	`CREATE TABLE IF NOT EXISTS pages (
+		id BIGSERIAL PRIMARY KEY,
+		title TEXT NOT NULL,
+		slug TEXT UNIQUE NOT NULL,
+		content TEXT NOT NULL DEFAULT '',
+		draft BOOLEAN NOT NULL DEFAULT FALSE,
+		auth_required BOOLEAN NOT NULL DEFAULT FALSE,
+		created_at TIMESTAMPTZ DEFAULT NOW(),
+		updated_at TIMESTAMPTZ DEFAULT NOW()
+	)`,
+	`CREATE TABLE IF NOT EXISTS challenge_flags (
+		id BIGSERIAL PRIMARY KEY,
+		challenge_id BIGINT NOT NULL,
+		content TEXT NOT NULL,
+		type TEXT NOT NULL DEFAULT 'exact',
+		data TEXT NOT NULL DEFAULT '',
+		FOREIGN KEY (challenge_id) REFERENCES challenges(id)
+	)`,
+	`CREATE TABLE IF NOT EXISTS challenge_files (
+		id BIGSERIAL PRIMARY KEY,
+		challenge_id BIGINT NOT NULL,
+		name TEXT NOT NULL,
+		location TEXT NOT NULL,
+		size BIGINT NOT NULL DEFAULT 0,
+		FOREIGN KEY (challenge_id) REFERENCES challenges(id)
+	)`,
+	`CREATE TABLE IF NOT EXISTS challenge_hints (
+		id BIGSERIAL PRIMARY KEY,
+		challenge_id BIGINT NOT NULL,
+		content TEXT NOT NULL,
+		cost INTEGER NOT NULL DEFAULT 0,
+		sort_order INTEGER NOT NULL DEFAULT 0,
+		FOREIGN KEY (challenge_id) REFERENCES challenges(id)
+	)`,
+	`CREATE TABLE IF NOT EXISTS challenge_tags (
+		id BIGSERIAL PRIMARY KEY,
+		challenge_id BIGINT NOT NULL,
+		tag TEXT NOT NULL
+	)`,
+	`CREATE TABLE IF NOT EXISTS user_fields (
+		id BIGSERIAL PRIMARY KEY,
+		name TEXT UNIQUE NOT NULL,
+		field_type TEXT NOT NULL DEFAULT 'text',
+		required BOOLEAN NOT NULL DEFAULT FALSE,
+		public BOOLEAN NOT NULL DEFAULT TRUE,
+		description TEXT NOT NULL DEFAULT ''
+	)`,
+	`CREATE TABLE IF NOT EXISTS user_field_values (
+		id BIGSERIAL PRIMARY KEY,
+		user_id BIGINT NOT NULL,
+		field_id BIGINT NOT NULL,
+		value TEXT NOT NULL DEFAULT '',
+		UNIQUE(user_id, field_id)
+	)`,
+	`CREATE TABLE IF NOT EXISTS ctf_settings (
+		key TEXT PRIMARY KEY,
+		value TEXT NOT NULL DEFAULT ''
+	)`,
 	// Additive migrations for existing PostgreSQL databases.
 	`ALTER TABLE users ADD COLUMN IF NOT EXISTS affiliation TEXT NOT NULL DEFAULT ''`,
 	`ALTER TABLE users ADD COLUMN IF NOT EXISTS website TEXT NOT NULL DEFAULT ''`,
 	`ALTER TABLE users ADD COLUMN IF NOT EXISTS country TEXT NOT NULL DEFAULT ''`,
 	`ALTER TABLE users ADD COLUMN IF NOT EXISTS banned BOOLEAN NOT NULL DEFAULT FALSE`,
+	`ALTER TABLE users ADD COLUMN IF NOT EXISTS verified BOOLEAN NOT NULL DEFAULT FALSE`,
+	`ALTER TABLE users ADD COLUMN IF NOT EXISTS hidden BOOLEAN NOT NULL DEFAULT FALSE`,
+	`ALTER TABLE users ADD COLUMN IF NOT EXISTS language TEXT NOT NULL DEFAULT ''`,
+	`ALTER TABLE challenges ADD COLUMN IF NOT EXISTS connection_info TEXT NOT NULL DEFAULT ''`,
+	`ALTER TABLE challenges ADD COLUMN IF NOT EXISTS max_attempts INTEGER NOT NULL DEFAULT 0`,
 }

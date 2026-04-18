@@ -13,5 +13,8 @@ type User struct {
 	Website      string    `json:"website" db:"website"`
 	Country      string    `json:"country" db:"country"`
 	Banned       bool      `json:"banned" db:"banned"`
+	Verified  bool   `json:"verified" db:"verified"`
+	Hidden    bool   `json:"hidden" db:"hidden"`
+	Language  string `json:"language" db:"language"`
 	CreatedAt    time.Time `json:"created_at" db:"created_at"`
 }

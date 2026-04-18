@@ -95,10 +95,10 @@ func (s *Server) handleMe(c echo.Context) error {
 	userID := getUserID(c)
 	var user models.User
 	err := s.db.QueryRow(
-		"SELECT id, username, email, role, score, affiliation, website, country, banned, created_at FROM users WHERE id = ?",
+		"SELECT id, username, email, role, score, affiliation, website, country, banned, verified, hidden, language, created_at FROM users WHERE id = ?",
 		userID,
 	).Scan(&user.ID, &user.Username, &user.Email, &user.Role, &user.Score,
-		&user.Affiliation, &user.Website, &user.Country, &user.Banned, &user.CreatedAt)
+		&user.Affiliation, &user.Website, &user.Country, &user.Banned, &user.Verified, &user.Hidden, &user.Language, &user.CreatedAt)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, map[string]string{"error": "user not found"})
 	}
@@ -124,13 +124,14 @@ func (s *Server) handleUpdateMe(c echo.Context) error {
 		Affiliation string `json:"affiliation"`
 		Website     string `json:"website"`
 		Country     string `json:"country"`
+		Language    string `json:"language"`
 	}
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
 	}
 	if _, err := s.db.Exec(
-		"UPDATE users SET affiliation=?, website=?, country=? WHERE id=?",
-		req.Affiliation, req.Website, req.Country, userID,
+		"UPDATE users SET affiliation=?, website=?, country=?, language=? WHERE id=?",
+		req.Affiliation, req.Website, req.Country, req.Language, userID,
 	); err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
 	}
