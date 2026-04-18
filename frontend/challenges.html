@@ -18,6 +18,9 @@
         <ul class="navbar-nav me-auto">
           <li class="nav-item"><a class="nav-link active" data-i18n="nav.challenges" href="/challenges">Challenges</a></li>
           <li class="nav-item"><a class="nav-link" data-i18n="nav.scoreboard" href="/scoreboard">Scoreboard</a></li>
+          <li class="nav-item" id="nav-notifications-li" style="display:none">
+            <a class="nav-link bell-indicator" data-i18n="nav.notifications" href="/notifications">🔔 Notifications</a>
+          </li>
         </ul>
         <ul class="navbar-nav ms-auto">
           <li class="nav-item" id="nav-admin" style="display:none"><a class="nav-link" data-i18n="nav.admin" href="/admin">Admin</a></li>
@@ -58,6 +61,21 @@
         </div>
         <div class="modal-body">
           <div id="modal-desc" class="mb-3" style="white-space:pre-wrap;color:var(--ctf-text)"></div>
+          <!-- Connection info -->
+          <div id="modal-connection" class="mb-3 d-none">
+            <p class="form-label mb-1" data-i18n="challenges.connection">Connection Info</p>
+            <div class="connection-info-block" id="modal-connection-info"></div>
+          </div>
+          <!-- Files -->
+          <div id="modal-files-section" class="mb-3 d-none">
+            <p class="form-label mb-1" data-i18n="challenges.files">Files</p>
+            <div id="modal-files-list"></div>
+          </div>
+          <!-- Hints -->
+          <div id="modal-hints-section" class="mb-3 d-none">
+            <p class="form-label mb-1" data-i18n="challenges.hints">Hints</p>
+            <div id="modal-hints-list"></div>
+          </div>
           <div id="modal-instance" class="d-none mb-3"></div>
           <div id="modal-solved-notice" class="alert alert-success d-none" data-i18n="challenges.solved_notice">✓ You already solved this challenge!</div>
           <form id="flag-form" onsubmit="submitFlag(event)">
@@ -95,6 +113,7 @@
       document.getElementById('nav-profile').textContent = user.username;
       document.getElementById('nav-profile-li').style.display = '';
       document.getElementById('nav-logout-li').style.display = '';
+      document.getElementById('nav-notifications-li').style.display = '';
       if (user.role === 'admin') document.getElementById('nav-admin').style.display = '';
       loadChallenges();
     })();

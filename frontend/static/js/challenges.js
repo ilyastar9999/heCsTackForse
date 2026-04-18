@@ -77,10 +77,62 @@ async function openChallenge(id) {
 
     if (!bsModal) bsModal = new bootstrap.Modal(document.getElementById('challengeModal'));
     bsModal.show();
+
+    // Load hints and files asynchronously
+    loadChallengeExtras(c.id, c);
   } catch (err) {
     alert(err.message);
   }
 }
+
+async function loadChallengeExtras(id, c) {
+  // Connection info
+  const connSection = document.getElementById('modal-connection');
+  const connInfo    = document.getElementById('modal-connection-info');
+  if (c.connection_info) {
+    connInfo.textContent = c.connection_info;
+    connSection.classList.remove('d-none');
+  } else {
+    connSection.classList.add('d-none');
+  }
+
+  // Files
+  const filesSection = document.getElementById('modal-files-section');
+  const filesList    = document.getElementById('modal-files-list');
+  try {
+    const files = await apiFetch('/api/challenges/' + id + '/files');
+    if (files && files.length) {
+      filesList.innerHTML = files.map(f => `
+        <div class="file-item">
+          <span class="file-icon">📄</span>
+          <a href="${escHtml(f.url || f.path || '')}" target="_blank" rel="noopener noreferrer">${escHtml(f.name || f.filename || f.url || 'File')}</a>
+        </div>`).join('');
+      filesSection.classList.remove('d-none');
+    } else {
+      filesSection.classList.add('d-none');
+    }
+  } catch (_) {
+    filesSection.classList.add('d-none');
+  }
+
+  // Hints
+  const hintsSection = document.getElementById('modal-hints-section');
+  const hintsList    = document.getElementById('modal-hints-list');
+  try {
+    const hints = await apiFetch('/api/challenges/' + id + '/hints');
+    if (hints && hints.length) {
+      hintsList.innerHTML = hints.map(h => `
+        <div class="hint-item">
+          <span class="hint-cost">${h.cost > 0 ? h.cost + ' pts' : t('challenges.hint_free')}</span>
+          <span class="ms-2 text-muted">${h.content !== undefined ? escHtml(h.content) : 'Unlock to reveal'}</span>
+        </div>`).join('');
+      hintsSection.classList.remove('d-none');
+    } else {
+      hintsSection.classList.add('d-none');
+    }
+  } catch (_) {
+    hintsSection.classList.add('d-none');
+  }
 
 async function loadInstanceStatus(challengeId) {
   const instBox = document.getElementById('modal-instance');
