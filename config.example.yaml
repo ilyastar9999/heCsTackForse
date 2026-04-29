@@ -20,6 +20,7 @@ ctf:
   flag_prefix: "FLAG{"
   flag_suffix: "}"
   seed_challenges: true  # insert built-in sample tasks on first run (skipped if challenges already exist)
+  language: en
 
 deployer:
   instance_ttl: 4h
@@ -28,6 +29,8 @@ deployer:
       enabled: false
       registry: ""
       network: ctf-net
+      challenges_dir: ./challenges
+      local_tag_prefix: hecstack/
     kubernetes:
       enabled: false
       kubeconfig: ""
@@ -45,10 +48,27 @@ ad:
   round_duration: 5m
   flag_lifetime: 2
   teams: []
+  checker_timeout: 30s
+  sploit_timeout: 60s
+  sploit_dir: ./tmp/sploits
+  vpn:
+    enabled: false
+    server_public_key: ""
+    server_endpoint: vpn.example.com:51820
+    server_ip: 10.8.0.1
+    team_subnet_base: "10.8."
+    game_net_cidr: 10.10.0.0/16
+    dns: 1.1.1.1
+    hook_command: ""
+    hook_args: []
+    hook_timeout: 15s
 
 plugins:
   enabled: false
   python: python
   script: ./python/ctfd_bridge.py
-  plugin_dirs: []
+  # CTFd-style Python plugins can be loaded from directories.
+  # Example: CTFd_chat_notifier.py registers the "chat_notifier" notifier.
+  plugin_dirs:
+    - ./python/ctfd_plugins
   modules: []

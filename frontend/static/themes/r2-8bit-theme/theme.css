@@ -1,0 +1,11 @@
+@import url("/ctfd-themes/ctfd-r2con-themes/r2-8bit-theme/static/css/vendor/bootstrap.min.css");
+@import url("https://fonts.googleapis.com/css?family=Press+Start+2P");
+@import url("https://unpkg.com/nes.css/css/nes.css");
+@import url("/ctfd-themes/ctfd-r2con-themes/r2-8bit-theme/static/css/vendor/font-awesome/fontawesome-fonts.css");
+@import url("/ctfd-themes/ctfd-r2con-themes/r2-8bit-theme/static/css/vendor/font-awesome/fontawesome-all.min.css");
+@import url("/ctfd-themes/ctfd-r2con-themes/r2-8bit-theme/static/css/vendor/font.css");
+@import url("/ctfd-themes/ctfd-r2con-themes/r2-8bit-theme/static/css/jumbotron.css");
+@import url("/ctfd-themes/ctfd-r2con-themes/r2-8bit-theme/static/css/sticky-footer.css");
+@import url("/ctfd-themes/ctfd-r2con-themes/r2-8bit-theme/static/css/base.css");
+@import url("../shared/hecstack-adapter.css");
+

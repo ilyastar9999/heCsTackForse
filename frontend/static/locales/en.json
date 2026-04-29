@@ -1,5 +1,6 @@
 {
   "nav.challenges": "Challenges",
+  "nav.modules": "Modules",
   "nav.scoreboard": "Scoreboard",
   "nav.profile": "Profile",
   "nav.admin": "Admin",
@@ -109,8 +110,11 @@
   "pages.save": "Save Page",
   "pages.title_label": "Title",
   "pages.slug_label": "Slug",
-  "pages.content_label": "Content (HTML)",
+  "pages.content_label": "Content (Markdown)",
   "pages.draft_label": "Draft (hidden from public)",
+
+  "modules.title": "Modules",
+  "modules.subtitle": "Theory and practice grouped by topic.",
 
   "statistics.title": "Statistics",
   "statistics.total_users": "Total Users",
@@ -124,6 +128,7 @@
 
   "admin.notifications": "Notifications",
   "admin.pages": "Pages",
+  "admin.modules": "Modules",
   "admin.config": "Config",
   "admin.config_save": "Save Config",
   "admin.theme_save": "Save Theme",

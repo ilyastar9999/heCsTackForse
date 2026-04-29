@@ -12,7 +12,12 @@ import (
 )
 
 func (s *Server) handleListPages(c echo.Context) error {
-	rows, err := s.db.Query(`SELECT id, title, slug, content, draft, auth_required, created_at, updated_at FROM pages WHERE draft=0 ORDER BY id`)
+	query := `SELECT id, title, slug, content, draft, auth_required, created_at, updated_at FROM pages WHERE draft=0`
+	if _, _, err := s.authenticateRequest(c); err != nil {
+		query += ` AND auth_required=0`
+	}
+	query += ` ORDER BY id`
+	rows, err := s.db.Query(query)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
 	}
@@ -41,6 +46,11 @@ func (s *Server) handleGetPage(c echo.Context) error {
 	}
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
+	}
+	if p.AuthRequired {
+		if _, _, err := s.authenticateRequest(c); err != nil {
+			return c.JSON(http.StatusUnauthorized, map[string]string{"error": "authentication required"})
+		}
 	}
 	return c.JSON(http.StatusOK, p)
 }

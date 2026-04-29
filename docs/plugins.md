@@ -165,11 +165,18 @@ plugins:
   python: python
   script: ./python/ctfd_bridge.py
   plugin_dirs:
-    - ./my-python-plugins
+    - ./python/ctfd_plugins
 ```
 
-Each plugin module can either expose a `register(registry)` function or use the
-decorators exported by `python/ctfd_bridge.py`:
+Each plugin module can expose a CTFd-style `load(app)` function, a
+`register(registry)` function, or use the decorators exported by
+`python/ctfd_bridge.py`.
+
+The bridge provides a small CTFd compatibility shim for common imports such as
+`CTFd.plugins.register_plugin_assets_directory`, menu registration helpers, and
+decorators. It does not run Flask; plugins that depend on Flask request handlers
+or SQLAlchemy internals need a small adapter that registers a heCsTackForse
+notifier, scorer, flag checker, challenge type, or home widget.
 
 ```python
 from ctfd_bridge import flag_checker, scorer
@@ -193,9 +200,31 @@ class MyScore:
 ```
 
 The bridge currently supports flag checkers, scorers, notifiers, and challenge
-type extensions. Flag checkers, scorers, and notifiers appear in `GET /api/plugins`.
+type extensions. It also supports home widgets rendered by the landing page.
+Flag checkers, scorers, notifiers, and home widgets appear in `GET /api/plugins`.
 Challenge types appear in `GET /api/challenge-types`. Flag checkers show up in
 the challenge editor automatically.
+
+### Example: CTFd Chat Notifier
+
+`python/ctfd_plugins/CTFd_chat_notifier.py` demonstrates a CTFd-style
+`load(app)` entrypoint:
+
+```python
+def load(app):
+    app.register_notifier(ChatNotifier())
+    app.register_home_widget(
+        "chat_notifier",
+        "Chat Notifier",
+        "Solve and announcement notifications can be sent to Slack, Discord, or Telegram.",
+        "/admin/plugins/chat-notifier",
+    )
+```
+
+When the bridge is enabled, the plugin registers the `chat_notifier` notifier.
+Admin settings under `/admin/plugins/chat-notifier` configure Slack, Discord, or
+Telegram credentials. The landing page renders the plugin home widget when it is
+loaded.
 
 ---
 

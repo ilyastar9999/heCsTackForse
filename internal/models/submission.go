@@ -7,6 +7,8 @@ type Submission struct {
 	UserID      int64     `json:"user_id" db:"user_id"`
 	TeamID      *int64    `json:"team_id,omitempty" db:"team_id"`
 	ChallengeID int64     `json:"challenge_id" db:"challenge_id"`
+	BucketKey   string    `json:"bucket_key,omitempty" db:"bucket_key"`
+	AwardedPts  int       `json:"awarded_points" db:"awarded_points"`
 	Flag        string    `json:"flag" db:"flag"`
 	IsCorrect   bool      `json:"is_correct" db:"is_correct"`
 	IP          string    `json:"ip" db:"ip"`
@@ -20,8 +22,12 @@ type Instance struct {
 	TeamID         *int64     `json:"team_id,omitempty" db:"team_id"`
 	InstanceType   string     `json:"instance_type" db:"instance_type"`
 	Backend        string     `json:"backend" db:"backend"`
+	TargetID       string     `json:"target_id,omitempty" db:"target_id"`
 	InstanceID     string     `json:"instance_id" db:"instance_id"`
 	ConnectionInfo string     `json:"connection_info" db:"connection_info"`
+	DynamicFlag    string     `json:"-" db:"dynamic_flag"`
+	ReservedCPUMil int        `json:"reserved_cpu_mil,omitempty" db:"reserved_cpu_mil"`
+	ReservedMemMB  int        `json:"reserved_memory_mb,omitempty" db:"reserved_memory_mb"`
 	CreatedAt      time.Time  `json:"created_at" db:"created_at"`
 	ExpiresAt      *time.Time `json:"expires_at,omitempty" db:"expires_at"`
 	Status         string     `json:"status" db:"status"`

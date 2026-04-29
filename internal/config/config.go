@@ -59,9 +59,14 @@ type BackendsConfig struct {
 }
 
 type DockerConfig struct {
-	Enabled  bool   `yaml:"enabled"`
-	Registry string `yaml:"registry"`
-	Network  string `yaml:"network"`
+	Enabled        bool   `yaml:"enabled"`
+	Registry       string `yaml:"registry"`
+	Host           string `yaml:"host"`
+	TLSVerify      bool   `yaml:"tls_verify"`
+	CertPath       string `yaml:"cert_path"`
+	Network        string `yaml:"network"`
+	ChallengesDir  string `yaml:"challenges_dir"`
+	LocalTagPrefix string `yaml:"local_tag_prefix"`
 }
 
 type KubernetesConfig struct {
@@ -95,13 +100,16 @@ type ADConfig struct {
 // VPNConfig holds the WireGuard server-side parameters needed to generate
 // per-team client configuration files.
 type VPNConfig struct {
-	Enabled         bool   `yaml:"enabled"`
-	ServerPublicKey string `yaml:"server_public_key"` // WireGuard public key of the server peer
-	ServerEndpoint  string `yaml:"server_endpoint"`   // host:port, e.g. vpn.example.com:51820
-	ServerIP        string `yaml:"server_ip"`         // server's WireGuard IP, e.g. 10.8.0.1
-	TeamSubnetBase  string `yaml:"team_subnet_base"`  // e.g. "10.8." — team N gets 10.8.N.0/24
-	GameNetCIDR     string `yaml:"game_net_cidr"`     // allowed-IPs route for the game network, e.g. 10.10.0.0/16
-	DNS             string `yaml:"dns"`               // optional DNS pushed to clients
+	Enabled         bool     `yaml:"enabled"`
+	ServerPublicKey string   `yaml:"server_public_key"` // WireGuard public key of the server peer
+	ServerEndpoint  string   `yaml:"server_endpoint"`   // host:port, e.g. vpn.example.com:51820
+	ServerIP        string   `yaml:"server_ip"`         // server's WireGuard IP, e.g. 10.8.0.1
+	TeamSubnetBase  string   `yaml:"team_subnet_base"`  // e.g. "10.8." - team N gets 10.8.N.0/24
+	GameNetCIDR     string   `yaml:"game_net_cidr"`     // allowed-IPs route for the game network, e.g. 10.10.0.0/16
+	DNS             string   `yaml:"dns"`               // optional DNS pushed to clients
+	HookCommand     string   `yaml:"hook_command"`      // optional peer sync command, receives env vars describing the peer
+	HookArgs        []string `yaml:"hook_args"`         // optional args for hook_command
+	HookTimeout     string   `yaml:"hook_timeout"`      // e.g. 15s
 }
 
 func Load(path string) (*Config, error) {
@@ -121,11 +129,14 @@ func Load(path string) (*Config, error) {
 	cfg.CTF.SeedChallenges = true
 	cfg.CTF.Language = "en"
 	cfg.Deployer.InstanceTTL = "4h"
+	cfg.Deployer.Backends.Docker.ChallengesDir = "./challenges"
+	cfg.Deployer.Backends.Docker.LocalTagPrefix = "hecstack/"
 	cfg.AD.RoundDuration = "5m"
 	cfg.AD.FlagLifetime = 2
 	cfg.AD.CheckerTimeout = "30s"
 	cfg.AD.SploitTimeout = "60s"
 	cfg.AD.SploitDir = "/tmp/sploits"
+	cfg.AD.VPN.HookTimeout = "15s"
 
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -134,5 +145,6 @@ func Load(path string) (*Config, error) {
 		}
 		return nil, err
 	}
-	return cfg, yaml.Unmarshal(data, cfg)
+	expanded := os.ExpandEnv(string(data))
+	return cfg, yaml.Unmarshal([]byte(expanded), cfg)
 }

@@ -60,7 +60,14 @@ func (p *PVEDeployer) doRequest(ctx context.Context, method, path string, body s
 		return nil, err
 	}
 	defer resp.Body.Close()
-	return io.ReadAll(resp.Body)
+	data, readErr := io.ReadAll(resp.Body)
+	if readErr != nil {
+		return nil, readErr
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("pve api returned %s: %s", resp.Status, strings.TrimSpace(string(data)))
+	}
+	return data, nil
 }
 
 func (p *PVEDeployer) Deploy(ctx context.Context, req DeployRequest) (*models.Instance, error) {

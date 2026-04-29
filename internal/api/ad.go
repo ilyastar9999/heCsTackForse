@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 
@@ -35,21 +36,47 @@ func (s *Server) handleADStatus(c echo.Context) error {
 // ────────────────────────────────────────────────────────────────────────────
 
 func (s *Server) handleADScoreboard(c echo.Context) error {
-	rows, err := s.db.Query(`
+	query := `
 		SELECT t.id, t.name,
-		       COALESCE(SUM(CASE WHEN svc.status='up' THEN 1 ELSE 0 END), 0) AS defence_pts,
-		       COALESCE(COUNT(DISTINCT sr.id), 0)                             AS attack_pts
+		       COALESCE(defs.defence_pts, 0)                                  AS defence_pts,
+		       COALESCE(atk.attack_pts, 0)                                    AS attack_pts
 		FROM teams t
-		LEFT JOIN ad_services svc ON svc.team_id = t.id
-		LEFT JOIN ad_sploit_results sr ON sr.flags_submitted > 0
-		          AND EXISTS (
-		              SELECT 1 FROM ad_sploits sp
-		              WHERE sp.id = sr.sploit_id AND sp.team_id = t.id
-		          )
-		GROUP BY t.id, t.name
-		ORDER BY (COALESCE(SUM(CASE WHEN svc.status='up' THEN 1 ELSE 0 END), 0) +
-		          COALESCE(COUNT(DISTINCT sr.id), 0)) DESC
-	`)
+		LEFT JOIN (
+			SELECT team_id, SUM(score) AS defence_pts
+			FROM ad_services
+			GROUP BY team_id
+		) defs ON defs.team_id = t.id
+		LEFT JOIN (
+			SELECT sp.team_id, SUM(sr.awarded_points) AS attack_pts
+			FROM ad_sploit_results sr
+			JOIN ad_sploits sp ON sp.id = sr.sploit_id
+			WHERE sr.flags_submitted > 0
+			GROUP BY sp.team_id
+		) atk ON atk.team_id = t.id
+		ORDER BY (COALESCE(defs.defence_pts, 0) + COALESCE(atk.attack_pts, 0)) DESC
+	`
+	if !s.cfg.CTF.TeamMode {
+		query = `
+			SELECT u.id, u.username,
+			       COALESCE(defs.defence_pts, 0)                                  AS defence_pts,
+			       COALESCE(atk.attack_pts, 0)                                    AS attack_pts
+			FROM users u
+			LEFT JOIN (
+				SELECT team_id, SUM(score) AS defence_pts
+				FROM ad_services
+				GROUP BY team_id
+			) defs ON defs.team_id = u.id
+			LEFT JOIN (
+				SELECT sp.team_id, SUM(sr.awarded_points) AS attack_pts
+				FROM ad_sploit_results sr
+				JOIN ad_sploits sp ON sp.id = sr.sploit_id
+				WHERE sr.flags_submitted > 0
+				GROUP BY sp.team_id
+			) atk ON atk.team_id = u.id
+			ORDER BY (COALESCE(defs.defence_pts, 0) + COALESCE(atk.attack_pts, 0)) DESC
+		`
+	}
+	rows, err := s.db.Query(query)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
 	}
@@ -82,8 +109,9 @@ func (s *Server) handleADScoreboard(c echo.Context) error {
 
 func (s *Server) handleADServices(c echo.Context) error {
 	rows, err := s.db.Query(`
-		SELECT svc.challenge_id, svc.team_id, svc.status, svc.round, svc.score, svc.checked_at
+		SELECT svc.challenge_id, ch.name, ch.checker_config, svc.team_id, svc.status, svc.round, svc.score, svc.checked_at
 		FROM ad_services svc
+		JOIN challenges ch ON ch.id = svc.challenge_id
 		INNER JOIN (
 		    SELECT challenge_id, team_id, MAX(round) AS max_round
 		    FROM ad_services
@@ -100,15 +128,91 @@ func (s *Server) handleADServices(c echo.Context) error {
 	var statuses []models.ADServiceStatus
 	for rows.Next() {
 		var st models.ADServiceStatus
-		if err := rows.Scan(&st.ChallengeID, &st.TeamID, &st.Status, &st.Round, &st.Score, &st.CheckedAt); err != nil {
+		var checkerConfig string
+		if err := rows.Scan(&st.ChallengeID, &st.ChallengeName, &checkerConfig, &st.TeamID, &st.Status, &st.Round, &st.Score, &st.CheckedAt); err != nil {
 			continue
 		}
+		st.MaxScore = adServiceMaxScore(checkerConfig)
 		statuses = append(statuses, st)
 	}
 	if statuses == nil {
 		statuses = []models.ADServiceStatus{}
 	}
 	return c.JSON(http.StatusOK, statuses)
+}
+
+func adServiceMaxScore(checkerConfig string) int {
+	if strings.TrimSpace(checkerConfig) == "" {
+		return 0
+	}
+	var cfg models.ADCheckerConfig
+	if err := json.Unmarshal([]byte(checkerConfig), &cfg); err != nil {
+		return 0
+	}
+	total := 0
+	for _, check := range cfg.DefenseChecks {
+		if check.Points > 0 {
+			total += check.Points
+		}
+	}
+	return total
+}
+
+func (s *Server) handleADCatalog(c echo.Context) error {
+	rows, err := s.db.Query(`
+		SELECT id, name, checker_config
+		FROM challenges
+		WHERE is_visible=TRUE AND challenge_type='attack_defence_attack'
+		ORDER BY category, points, id
+	`)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
+	}
+	defer rows.Close()
+
+	type bucketEntry struct {
+		Key    string `json:"key"`
+		Label  string `json:"label"`
+		Points int    `json:"points"`
+	}
+	type challengeEntry struct {
+		ID      int64         `json:"id"`
+		Name    string        `json:"name"`
+		Buckets []bucketEntry `json:"buckets"`
+	}
+
+	var catalog []challengeEntry
+	for rows.Next() {
+		var id int64
+		var name string
+		var checkerConfig string
+		if err := rows.Scan(&id, &name, &checkerConfig); err != nil {
+			continue
+		}
+		entry := challengeEntry{ID: id, Name: name, Buckets: []bucketEntry{}}
+		var cfg models.ADCheckerConfig
+		if strings.TrimSpace(checkerConfig) != "" && json.Unmarshal([]byte(checkerConfig), &cfg) == nil {
+			for _, bucket := range cfg.Buckets() {
+				label := strings.TrimSpace(bucket.Label)
+				if label == "" {
+					label = strings.TrimSpace(bucket.Name)
+				}
+				if label == "" {
+					label = bucket.Key
+				}
+				entry.Buckets = append(entry.Buckets, bucketEntry{
+					Key:    bucket.Key,
+					Label:  label,
+					Points: bucket.Points,
+				})
+			}
+		}
+		catalog = append(catalog, entry)
+	}
+	if catalog == nil {
+		catalog = []challengeEntry{}
+	}
+	return c.JSON(http.StatusOK, catalog)
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -119,52 +223,16 @@ func (s *Server) handleADGetVPN(c echo.Context) error {
 	if !s.cfg.AD.VPN.Enabled {
 		return c.JSON(http.StatusNotFound, map[string]string{"error": "VPN not enabled"})
 	}
-	teamID := s.getTeamIDForUser(getUserID(c))
-	if teamID == 0 {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "you must be in a team to get VPN config"})
+	ownerID := s.getTeamIDForUser(getUserID(c))
+	if ownerID == 0 {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "VPN owner is not available for this account"})
 	}
 
-	// Fetch or create VPN peer for this team
-	var peer models.VPNPeer
-	err := s.db.QueryRow(
-		`SELECT id, team_id, private_key, public_key, allowed_ip, created_at FROM ad_vpn_peers WHERE team_id=?`,
-		teamID,
-	).Scan(&peer.ID, &peer.TeamID, &peer.PrivateKey, &peer.PublicKey, &peer.AllowedIP, &peer.CreatedAt)
-
-	if err == sql.ErrNoRows {
-		// Generate new keypair
-		privB64, pubB64, genErr := ad.GenerateWireGuardKeys()
-		if genErr != nil {
-			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to generate VPN keys: " + genErr.Error()})
-		}
-		// Assign team IP from config: base + teamID + ".1/24"
-		base := s.cfg.AD.VPN.TeamSubnetBase
-		if base == "" {
-			base = "10.8."
-		}
-		allowedIP := fmt.Sprintf("%s%d.0/24", base, teamID)
-
-		newID, insErr := s.db.InsertGetID(
-			`INSERT INTO ad_vpn_peers (team_id, private_key, public_key, allowed_ip) VALUES (?, ?, ?, ?)`,
-			teamID, privB64, pubB64, allowedIP,
-		)
-		if insErr != nil {
-			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error: " + insErr.Error()})
-		}
-		peer.TeamID = teamID
-		peer.PrivateKey = privB64
-		peer.PublicKey = pubB64
-		peer.ID = newID
-	} else if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
+	peer, teamIP, err := s.ensureADVPNPeer(ownerID, false)
+	if err != nil {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": err.Error()})
 	}
-
 	cfg := s.cfg.AD.VPN
-	base := cfg.TeamSubnetBase
-	if base == "" {
-		base = "10.8."
-	}
-	teamIP := fmt.Sprintf("%s%d.1/24", base, teamID)
 
 	conf := ad.BuildClientConfig(
 		peer.PrivateKey,
@@ -177,8 +245,79 @@ func (s *Server) handleADGetVPN(c echo.Context) error {
 	)
 
 	c.Response().Header().Set("Content-Type", "text/plain; charset=utf-8")
-	c.Response().Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="team%d-wg.conf"`, teamID))
+	ownerPrefix := "user"
+	if s.cfg.CTF.TeamMode {
+		ownerPrefix = "team"
+	}
+	c.Response().Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s%d-wg.conf"`, ownerPrefix, ownerID))
 	return c.String(http.StatusOK, conf)
+}
+
+func (s *Server) handleADVPNStatus(c echo.Context) error {
+	if !s.cfg.AD.VPN.Enabled {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "VPN not enabled"})
+	}
+	ownerID := s.getTeamIDForUser(getUserID(c))
+	if ownerID == 0 {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "VPN owner is not available for this account"})
+	}
+
+	peer, teamIP, err := s.ensureADVPNPeer(ownerID, false)
+	if err != nil && peer.ID == 0 {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": err.Error()})
+	}
+
+	ownerType := "user"
+	if s.cfg.CTF.TeamMode {
+		ownerType = "team"
+	}
+	cfg := s.cfg.AD.VPN
+	payload := map[string]any{
+		"enabled":         true,
+		"owner_type":      ownerType,
+		"owner_id":        ownerID,
+		"provisioned":     peer.Provisioned,
+		"last_sync_error": peer.LastSyncError,
+		"client_address":  teamIP,
+		"allowed_subnet":  peer.AllowedIP,
+		"server_endpoint": cfg.ServerEndpoint,
+		"server_ip":       cfg.ServerIP,
+		"game_net_cidr":   cfg.GameNetCIDR,
+		"dns":             cfg.DNS,
+		"download_url":    "/api/ad/vpn",
+		"sync_url":        "/api/ad/vpn/sync",
+	}
+	if err != nil {
+		payload["last_sync_error"] = err.Error()
+	}
+	return c.JSON(http.StatusOK, payload)
+}
+
+func (s *Server) handleADSyncVPN(c echo.Context) error {
+	if !s.cfg.AD.VPN.Enabled {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "VPN not enabled"})
+	}
+	ownerID := s.getTeamIDForUser(getUserID(c))
+	if ownerID == 0 {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "VPN owner is not available for this account"})
+	}
+
+	peer, teamIP, err := s.ensureADVPNPeer(ownerID, true)
+	if err != nil {
+		return c.JSON(http.StatusServiceUnavailable, map[string]any{
+			"error":       err.Error(),
+			"provisioned": peer.Provisioned,
+			"last_error":  peer.LastSyncError,
+		})
+	}
+
+	return c.JSON(http.StatusOK, map[string]any{
+		"message":        "VPN access synchronized",
+		"provisioned":    peer.Provisioned,
+		"last_error":     peer.LastSyncError,
+		"client_address": teamIP,
+		"allowed_subnet": peer.AllowedIP,
+	})
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -191,7 +330,7 @@ func (s *Server) handleADListSploits(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "you must be in a team"})
 	}
 	rows, err := s.db.Query(
-		`SELECT id, team_id, challenge_id, name, language, enabled, created_at, last_run_at
+		`SELECT id, team_id, challenge_id, bucket_key, name, language, enabled, created_at, last_run_at
 		 FROM ad_sploits WHERE team_id=? ORDER BY id`,
 		teamID,
 	)
@@ -202,7 +341,7 @@ func (s *Server) handleADListSploits(c echo.Context) error {
 	var sploits []models.Sploit
 	for rows.Next() {
 		var sp models.Sploit
-		if err := rows.Scan(&sp.ID, &sp.TeamID, &sp.ChallengeID, &sp.Name,
+		if err := rows.Scan(&sp.ID, &sp.TeamID, &sp.ChallengeID, &sp.BucketKey, &sp.Name,
 			&sp.Language, &sp.Enabled, &sp.CreatedAt, &sp.LastRunAt); err != nil {
 			continue
 		}
@@ -221,6 +360,7 @@ func (s *Server) handleADCreateSploit(c echo.Context) error {
 	}
 	var req struct {
 		ChallengeID int64  `json:"challenge_id"`
+		BucketKey   string `json:"bucket_key"`
 		Name        string `json:"name"`
 		Language    string `json:"language"`
 		Script      string `json:"script"`
@@ -231,12 +371,18 @@ func (s *Server) handleADCreateSploit(c echo.Context) error {
 	if req.Script == "" || req.Name == "" {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "name and script are required"})
 	}
+	if req.ChallengeID <= 0 {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "a specific attack challenge must be selected"})
+	}
 	if req.Language == "" {
 		req.Language = "python3"
 	}
+	if err := s.validateADSploitTarget(req.ChallengeID, req.BucketKey); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+	}
 	id, err := s.db.InsertGetID(
-		`INSERT INTO ad_sploits (team_id, challenge_id, name, language, script, enabled) VALUES (?,?,?,?,?,TRUE)`,
-		teamID, req.ChallengeID, req.Name, req.Language, req.Script,
+		`INSERT INTO ad_sploits (team_id, challenge_id, bucket_key, name, language, script, enabled) VALUES (?,?,?,?,?,?,TRUE)`,
+		teamID, req.ChallengeID, req.BucketKey, req.Name, req.Language, req.Script,
 	)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error: " + err.Error()})
@@ -252,10 +398,12 @@ func (s *Server) handleADUpdateSploit(c echo.Context) error {
 	teamID := s.getTeamIDForUser(getUserID(c))
 
 	var req struct {
-		Name     string `json:"name"`
-		Language string `json:"language"`
-		Script   string `json:"script"`
-		Enabled  *bool  `json:"enabled"`
+		ChallengeID *int64  `json:"challenge_id"`
+		BucketKey   *string `json:"bucket_key"`
+		Name        string  `json:"name"`
+		Language    string  `json:"language"`
+		Script      string  `json:"script"`
+		Enabled     *bool   `json:"enabled"`
 	}
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
@@ -279,6 +427,21 @@ func (s *Server) handleADUpdateSploit(c echo.Context) error {
 	}
 	if req.Script != "" {
 		_, _ = s.db.Exec(`UPDATE ad_sploits SET script=? WHERE id=?`, req.Script, sploitID)
+	}
+	if req.ChallengeID != nil || req.BucketKey != nil {
+		var challengeID int64
+		var bucketKey string
+		_ = s.db.QueryRow(`SELECT challenge_id, bucket_key FROM ad_sploits WHERE id=?`, sploitID).Scan(&challengeID, &bucketKey)
+		if req.ChallengeID != nil {
+			challengeID = *req.ChallengeID
+		}
+		if req.BucketKey != nil {
+			bucketKey = strings.TrimSpace(*req.BucketKey)
+		}
+		if err := s.validateADSploitTarget(challengeID, bucketKey); err != nil {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		}
+		_, _ = s.db.Exec(`UPDATE ad_sploits SET challenge_id=?, bucket_key=? WHERE id=?`, challengeID, bucketKey, sploitID)
 	}
 	if req.Name != "" {
 		_, _ = s.db.Exec(`UPDATE ad_sploits SET name=? WHERE id=?`, req.Name, sploitID)
@@ -321,7 +484,7 @@ func (s *Server) handleADSploitResults(c echo.Context) error {
 		return c.JSON(http.StatusForbidden, map[string]string{"error": "forbidden"})
 	}
 	rows, err := s.db.Query(`
-		SELECT id, sploit_id, target_team_id, round, flags_captured, flags_submitted, error, ran_at
+		SELECT id, sploit_id, target_team_id, round, bucket_key, awarded_points, stdout, flags_captured, flags_submitted, error, ran_at
 		FROM ad_sploit_results WHERE sploit_id=? ORDER BY round DESC LIMIT 200`,
 		sploitID,
 	)
@@ -332,7 +495,7 @@ func (s *Server) handleADSploitResults(c echo.Context) error {
 	var results []models.SploitResult
 	for rows.Next() {
 		var res models.SploitResult
-		if err := rows.Scan(&res.ID, &res.SploitID, &res.TargetTeamID, &res.Round,
+		if err := rows.Scan(&res.ID, &res.SploitID, &res.TargetTeamID, &res.Round, &res.BucketKey, &res.AwardedPoints, &res.Stdout,
 			&res.FlagsCaptured, &res.FlagsSubmitted, &res.Error, &res.RanAt); err != nil {
 			continue
 		}
@@ -401,9 +564,128 @@ func (s *Server) handleADSubmitFlag(c echo.Context) error {
 
 // getTeamIDForUser looks up which team the user belongs to.
 func (s *Server) getTeamIDForUser(userID int64) int64 {
+	if !s.cfg.CTF.TeamMode {
+		return userID
+	}
 	var teamID int64
 	_ = s.db.QueryRow(
 		`SELECT team_id FROM team_members WHERE user_id=? LIMIT 1`, userID,
 	).Scan(&teamID)
 	return teamID
+}
+
+func (s *Server) validateADSploitTarget(challengeID int64, bucketKey string) error {
+	bucketKey = strings.TrimSpace(bucketKey)
+	if challengeID == 0 {
+		if bucketKey != "" {
+			return fmt.Errorf("bucket_key requires a specific attack-defence challenge")
+		}
+		return nil
+	}
+
+	var challengeType string
+	var checkerConfig string
+	if err := s.db.QueryRow(`SELECT challenge_type, checker_config FROM challenges WHERE id=?`, challengeID).Scan(&challengeType, &checkerConfig); err != nil {
+		if err == sql.ErrNoRows {
+			return fmt.Errorf("challenge not found")
+		}
+		return fmt.Errorf("failed to load challenge")
+	}
+	if challengeType != "attack_defence_attack" {
+		return fmt.Errorf("challenge %d is not an attack-defence attack challenge", challengeID)
+	}
+	if bucketKey == "" {
+		return nil
+	}
+
+	var cfg models.ADCheckerConfig
+	if strings.TrimSpace(checkerConfig) == "" {
+		return fmt.Errorf("bucket %q is not configured for this challenge", bucketKey)
+	}
+	if err := json.Unmarshal([]byte(checkerConfig), &cfg); err != nil {
+		return fmt.Errorf("invalid challenge checker_config")
+	}
+	for _, bucket := range cfg.Buckets() {
+		if bucket.Key == bucketKey {
+			return nil
+		}
+	}
+	return fmt.Errorf("bucket %q is not configured for this challenge", bucketKey)
+}
+
+func (s *Server) ensureADVPNPeer(ownerID int64, forceSync bool) (models.VPNPeer, string, error) {
+	if ownerID == 0 {
+		return models.VPNPeer{}, "", fmt.Errorf("VPN owner is not available for this account")
+	}
+	if !s.cfg.AD.VPN.Enabled {
+		return models.VPNPeer{}, "", fmt.Errorf("VPN not enabled")
+	}
+	if strings.TrimSpace(s.cfg.AD.VPN.ServerPublicKey) == "" || strings.TrimSpace(s.cfg.AD.VPN.ServerEndpoint) == "" || strings.TrimSpace(s.cfg.AD.VPN.GameNetCIDR) == "" {
+		return models.VPNPeer{}, "", fmt.Errorf("VPN is enabled but not fully configured")
+	}
+
+	base := s.cfg.AD.VPN.TeamSubnetBase
+	if base == "" {
+		base = "10.8."
+	}
+	allowedIP := fmt.Sprintf("%s%d.0/24", base, ownerID)
+	teamIP := fmt.Sprintf("%s%d.1/24", base, ownerID)
+
+	var peer models.VPNPeer
+	err := s.db.QueryRow(
+		`SELECT id, team_id, private_key, public_key, allowed_ip, provisioned, last_sync_error, synced_at, created_at FROM ad_vpn_peers WHERE team_id=?`,
+		ownerID,
+	).Scan(&peer.ID, &peer.TeamID, &peer.PrivateKey, &peer.PublicKey, &peer.AllowedIP, &peer.Provisioned, &peer.LastSyncError, &peer.SyncedAt, &peer.CreatedAt)
+	if err == sql.ErrNoRows {
+		privB64, pubB64, genErr := ad.GenerateWireGuardKeys()
+		if genErr != nil {
+			return models.VPNPeer{}, "", fmt.Errorf("failed to generate VPN keys: %w", genErr)
+		}
+		newID, insErr := s.db.InsertGetID(
+			`INSERT INTO ad_vpn_peers (team_id, private_key, public_key, allowed_ip, provisioned, last_sync_error) VALUES (?, ?, ?, ?, ?, ?)`,
+			ownerID, privB64, pubB64, allowedIP, false, "",
+		)
+		if insErr != nil {
+			return models.VPNPeer{}, "", fmt.Errorf("db error: %w", insErr)
+		}
+		peer = models.VPNPeer{
+			ID:            newID,
+			TeamID:        ownerID,
+			PrivateKey:    privB64,
+			PublicKey:     pubB64,
+			AllowedIP:     allowedIP,
+			Provisioned:   false,
+			LastSyncError: "",
+		}
+	} else if err != nil {
+		return models.VPNPeer{}, "", fmt.Errorf("db error")
+	}
+
+	if peer.AllowedIP != allowedIP {
+		if _, err := s.db.Exec(`UPDATE ad_vpn_peers SET allowed_ip=?, provisioned=0, last_sync_error='', synced_at=NULL WHERE id=?`, allowedIP, peer.ID); err != nil {
+			return models.VPNPeer{}, "", fmt.Errorf("db error: %w", err)
+		}
+		peer.AllowedIP = allowedIP
+		peer.Provisioned = false
+		peer.LastSyncError = ""
+		peer.SyncedAt = nil
+	}
+
+	if !peer.Provisioned || forceSync {
+		if err := ad.RunVPNHook(s.cfg.AD.VPN, "provision", peer, teamIP); err != nil {
+			peer.Provisioned = false
+			peer.LastSyncError = err.Error()
+			peer.SyncedAt = nil
+			_, _ = s.db.Exec(`UPDATE ad_vpn_peers SET provisioned=0, last_sync_error=?, synced_at=NULL WHERE id=?`, peer.LastSyncError, peer.ID)
+			return peer, teamIP, err
+		}
+		peer.Provisioned = true
+		peer.LastSyncError = ""
+		_, _ = s.db.Exec(`UPDATE ad_vpn_peers SET provisioned=1, last_sync_error='', synced_at=CURRENT_TIMESTAMP WHERE id=?`, peer.ID)
+		if scanErr := s.db.QueryRow(`SELECT synced_at FROM ad_vpn_peers WHERE id=?`, peer.ID).Scan(&peer.SyncedAt); scanErr != nil {
+			peer.SyncedAt = nil
+		}
+	}
+
+	return peer, teamIP, nil
 }

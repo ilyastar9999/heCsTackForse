@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deploy Targets - heCsTackForse</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg sticky-top">
+    <div class="container-fluid px-4">
+      <a class="navbar-brand" href="/">heCsTackForse</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navMenu">
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item"><a class="nav-link" href="/challenges">Challenges</a></li>
+          <li class="nav-item"><a class="nav-link" href="/modules">Modules</a></li>
+          <li class="nav-item"><a class="nav-link" href="/scoreboard">Scoreboard</a></li>
+        </ul>
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item"><a class="nav-link active" href="/admin">Admin</a></li>
+          <li class="nav-item"><a class="nav-link" href="/profile">Profile</a></li>
+          <li class="nav-item"><a class="nav-link" href="#" onclick="logout()">Logout</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="page-container">
+    <h1 class="page-title">Deploy Targets</h1>
+
+    <ul class="nav nav-tabs mb-4">
+      <li class="nav-item"><a class="nav-link" href="/admin">Challenges</a></li>
+      <li class="nav-item"><a class="nav-link" href="/admin#users">Users</a></li>
+      <li class="nav-item"><a class="nav-link" href="/admin#notifications">Notifications</a></li>
+      <li class="nav-item"><a class="nav-link" href="/admin#pages">Pages</a></li>
+      <li class="nav-item"><a class="nav-link" href="/admin#modules">Modules</a></li>
+      <li class="nav-item"><a class="nav-link" href="/admin#settings">Settings</a></li>
+      <li class="nav-item"><a class="nav-link active" href="/admin/deploy">Deploy</a></li>
+      <li class="nav-item"><a class="nav-link" href="/admin/plugins">Plugins</a></li>
+    </ul>
+
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+      <div>
+        <p class="text-muted mb-0">Challenge `deploy_backend` can point to `auto`, a backend type (`docker`, `kubernetes`), or a specific target id from this page.</p>
+      </div>
+      <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" href="/admin">Back to Admin</a>
+        <button class="btn btn-primary" onclick="saveDeployConfig()">Save</button>
+      </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+      <div class="col-lg-4">
+        <div class="card p-4 h-100">
+          <h5 class="mb-3">Scheduler</h5>
+          <label class="form-label">Mode</label>
+          <select class="form-select mb-3" id="deploy-mode">
+            <option value="ordered">Ordered</option>
+            <option value="balanced">Balanced</option>
+          </select>
+          <div class="small text-muted">
+            `ordered` fills targets by `order`.<br>
+            `balanced` rotates over all targets that still have free capacity.
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-8">
+        <div class="card p-4 h-100">
+          <h5 class="mb-3">Runtime Contract</h5>
+          <div class="small text-muted">
+            Docker targets can build local images from `./challenges/&lt;name&gt;` via `deploy_config.build_context`, or run external images from the `image` field.<br>
+            Common env: `HECSTACK_CHALLENGE_ID`, `HECSTACK_CHALLENGE_TYPE`, `HECSTACK_DEPLOY_TYPE`, `HECSTACK_USER_ID`, `HECSTACK_TEAM_ID`.<br>
+            Dynamic deploy also injects `FLAG` and `DYNAMIC_FLAG`.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card p-0 mb-3">
+      <div class="d-flex justify-content-between align-items-center p-3 border-bottom">
+        <h5 class="mb-0">Targets</h5>
+        <button class="btn btn-sm btn-primary" onclick="addTargetRow()">Add Target</button>
+      </div>
+      <div class="p-3">
+        <div id="deploy-targets-body" class="d-flex flex-column gap-3">
+          <div class="text-center py-3 text-muted">Loading...</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="deploy-error" class="alert alert-danger d-none"></div>
+    <div id="deploy-success" class="alert alert-success d-none"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/nav.js"></script>
+  <script>
+    function escHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;');
+    }
+
+    async function logout() {
+      await apiFetch('/api/auth/logout', { method: 'POST' });
+      location.href = '/login';
+    }
+
+    function targetSettingsMarkup(target = {}) {
+      const type = String(target.type || 'docker');
+      if (type === 'docker') {
+        return `
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="small text-uppercase text-muted mb-2">Docker API</div>
+              <label class="form-label mb-1">Docker Host</label>
+              <input class="form-control form-control-sm mb-2" data-field="host" value="${escHtml(target.host || '')}" placeholder="tcp://docker.example:2376">
+              <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" data-field="tls_verify" ${target.tls_verify ? 'checked' : ''}>
+                <label class="form-check-label">TLS verify</label>
+              </div>
+              <label class="form-label mb-1">Docker Cert Path</label>
+              <input class="form-control form-control-sm" data-field="cert_path" value="${escHtml(target.cert_path || '')}" placeholder="C:/docker/certs">
+            </div>
+            <div class="col-md-6">
+              <div class="small text-uppercase text-muted mb-2">Runtime Defaults</div>
+              <label class="form-label mb-1">Registry</label>
+              <input class="form-control form-control-sm mb-2" data-field="registry" value="${escHtml(target.registry || '')}" placeholder="registry.local:5000">
+              <label class="form-label mb-1">Docker Network</label>
+              <input class="form-control form-control-sm mb-2" data-field="network" value="${escHtml(target.network || '')}" placeholder="ctf-net">
+              <label class="form-label mb-1">Challenges Dir</label>
+              <input class="form-control form-control-sm mb-2" data-field="challenges_dir" value="${escHtml(target.challenges_dir || '')}" placeholder="./challenges">
+              <label class="form-label mb-1">Local Tag Prefix</label>
+              <input class="form-control form-control-sm" data-field="local_tag_prefix" value="${escHtml(target.local_tag_prefix || '')}" placeholder="hecstack/">
+            </div>
+          </div>
+        `;
+      }
+      if (type === 'kubernetes') {
+        return `
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="small text-uppercase text-muted mb-2">Cluster Access</div>
+              <label class="form-label mb-1">Kubeconfig</label>
+              <input class="form-control form-control-sm mb-2" data-field="kubeconfig" value="${escHtml(target.kubeconfig || '')}" placeholder="C:/kube/config">
+              <label class="form-label mb-1">Namespace</label>
+              <input class="form-control form-control-sm" data-field="namespace" value="${escHtml(target.namespace || '')}" placeholder="ctf">
+            </div>
+            <div class="col-md-6">
+              <div class="small text-uppercase text-muted mb-2">Deploy Contract</div>
+              <div class="small text-muted">Images must be pullable by the cluster. Ports from challenge deploy_config become container ports and a Kubernetes Service. NodePort can be supplied explicitly; blank ports stay cluster-assigned.</div>
+            </div>
+          </div>
+        `;
+      }
+      return `<div class="small text-muted">Proxmox VE is kept as a config placeholder for now. Runtime deployment is not wired in this pass.</div>`;
+    }
+
+    function renderTargets(targets) {
+      const body = document.getElementById('deploy-targets-body');
+      if (!targets.length) {
+        body.innerHTML = '<div class="text-center py-3 text-muted">No targets configured.</div>';
+        return;
+      }
+      body.innerHTML = targets.map((target, index) => `
+        <div class="border rounded p-3 deploy-target-card" data-index="${index}">
+          <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+            <div class="row g-2 flex-grow-1">
+              <div class="col-md-4">
+                <label class="form-label mb-1">Target ID</label>
+                <input class="form-control form-control-sm" data-field="id" value="${escHtml(target.id || '')}" placeholder="docker-prod-1">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label mb-1">Target Type</label>
+                <select class="form-select form-select-sm" data-field="type" onchange="updateTargetSettings(this)">
+                  <option value="docker" ${target.type === 'docker' ? 'selected' : ''}>Docker</option>
+                  <option value="kubernetes" ${target.type === 'kubernetes' ? 'selected' : ''}>Kubernetes</option>
+                  <option value="pve" ${target.type === 'pve' ? 'selected' : ''}>Proxmox VE</option>
+                </select>
+              </div>
+              <div class="col-md-2">
+                <label class="form-label mb-1">Order</label>
+                <input class="form-control form-control-sm" type="number" data-field="order" value="${Number(target.order || 0)}">
+              </div>
+              <div class="col-md-3 d-flex align-items-end">
+                <div class="form-check mb-2">
+                  <input class="form-check-input" type="checkbox" data-field="enabled" ${target.enabled !== false ? 'checked' : ''}>
+                  <label class="form-check-label">Enabled</label>
+                </div>
+              </div>
+            </div>
+            <button class="btn btn-sm btn-outline-danger" onclick="removeTargetRow(${index})">Remove</button>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-md-4">
+              <label class="form-label mb-1">Max Instances</label>
+              <input class="form-control form-control-sm" type="number" data-field="max_instances" value="${Number(target.max_instances || 0)}" placeholder="0 = unlimited">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label mb-1">Max CPU</label>
+              <input class="form-control form-control-sm" type="number" step="0.1" data-field="max_cpu" value="${Number(target.max_cpu || 0)}" placeholder="0 = unlimited">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label mb-1">Max Memory MB</label>
+              <input class="form-control form-control-sm" type="number" data-field="max_memory_mb" value="${Number(target.max_memory_mb || 0)}" placeholder="0 = unlimited">
+            </div>
+          </div>
+          <div class="target-settings">${targetSettingsMarkup(target)}</div>
+        </div>
+      `).join('');
+    }
+
+    function updateTargetSettings(select) {
+      const card = select.closest('.deploy-target-card');
+      card.querySelector('.target-settings').innerHTML = targetSettingsMarkup({ type: select.value });
+    }
+
+    async function loadDeployConfig() {
+      const payload = await apiFetch('/api/admin/deploy');
+      document.getElementById('deploy-mode').value = payload.mode || 'ordered';
+      renderTargets(Array.isArray(payload.targets) ? payload.targets : []);
+    }
+
+    function addTargetRow() {
+      const targets = collectTargets();
+      targets.push({
+        id: '', type: 'docker', enabled: true, order: targets.length * 10 + 10,
+        max_instances: 0, max_cpu: 0, max_memory_mb: 0
+      });
+      renderTargets(targets);
+    }
+
+    function removeTargetRow(index) {
+      const targets = collectTargets();
+      targets.splice(index, 1);
+      renderTargets(targets);
+    }
+
+    function collectTargets() {
+      return [...document.querySelectorAll('#deploy-targets-body .deploy-target-card[data-index]')].map(row => {
+        const target = {};
+        row.querySelectorAll('[data-field]').forEach(input => {
+          const field = input.dataset.field;
+          if (input.type === 'checkbox') {
+            target[field] = input.checked;
+          } else if (input.type === 'number') {
+            target[field] = input.step === '0.1' ? parseFloat(input.value || '0') : parseInt(input.value || '0', 10);
+          } else {
+            target[field] = input.value.trim();
+          }
+        });
+        return target;
+      });
+    }
+
+    async function saveDeployConfig() {
+      const errEl = document.getElementById('deploy-error');
+      const okEl = document.getElementById('deploy-success');
+      errEl.classList.add('d-none');
+      okEl.classList.add('d-none');
+      try {
+        const payload = { mode: document.getElementById('deploy-mode').value, targets: collectTargets() };
+        await apiFetch('/api/admin/deploy', { method: 'PUT', body: JSON.stringify(payload) });
+        okEl.textContent = 'Deploy scheduler saved.';
+        okEl.classList.remove('d-none');
+        await loadDeployConfig();
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.classList.remove('d-none');
+      }
+    }
+
+    (async () => {
+      const user = await getMe();
+      if (!user || user.role !== 'admin') { location.href = '/'; return; }
+      await applyModeAwareNav();
+      await loadDeployConfig();
+    })();
+  </script>
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Plugins – heCsTackForse</title>
+  <title>Plugins - heCsTackForse</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
@@ -16,21 +16,14 @@
       </button>
       <div class="collapse navbar-collapse" id="navMenu">
         <ul class="navbar-nav me-auto">
-          <li class="nav-item"><a class="nav-link" data-i18n="nav.challenges" href="/challenges">Challenges</a></li>
-          <li class="nav-item"><a class="nav-link" data-i18n="nav.scoreboard" href="/scoreboard">Scoreboard</a></li>
+          <li class="nav-item"><a class="nav-link" href="/challenges">Challenges</a></li>
+          <li class="nav-item"><a class="nav-link" href="/modules">Modules</a></li>
+          <li class="nav-item"><a class="nav-link" href="/scoreboard">Scoreboard</a></li>
         </ul>
         <ul class="navbar-nav ms-auto">
-          <li class="nav-item"><a class="nav-link" data-i18n="nav.admin" href="/admin">Admin</a></li>
-          <li class="nav-item"><a class="nav-link active" href="/admin/plugins">Plugins</a></li>
-          <li class="nav-item"><a class="nav-link" data-i18n="nav.profile" href="/profile">Profile</a></li>
-          <li class="nav-item"><a class="nav-link" data-i18n="nav.logout" href="#" onclick="logout()">Logout</a></li>
-          <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown"><span id="lang-toggle-label">EN</span></a>
-            <ul class="dropdown-menu dropdown-menu-end" style="min-width:120px">
-              <li><a class="dropdown-item" href="#" onclick="setLang('en');return false">English</a></li>
-              <li><a class="dropdown-item" href="#" onclick="setLang('ru');return false">Русский</a></li>
-            </ul>
-          </li>
+          <li class="nav-item"><a class="nav-link active" href="/admin">Admin</a></li>
+          <li class="nav-item"><a class="nav-link" href="/profile">Profile</a></li>
+          <li class="nav-item"><a class="nav-link" href="#" onclick="logout()">Logout</a></li>
         </ul>
       </div>
     </div>
@@ -38,20 +31,31 @@
 
   <div class="page-container">
     <h1 class="page-title">Plugins</h1>
-    <p class="text-muted mb-4">Plugin-specific admin pages live here. Use the cards below to open the settings pages exposed by installed plugins.</p>
+
+    <ul class="nav nav-tabs mb-4">
+      <li class="nav-item"><a class="nav-link" href="/admin">Challenges</a></li>
+      <li class="nav-item"><a class="nav-link" href="/admin#users">Users</a></li>
+      <li class="nav-item"><a class="nav-link" href="/admin#notifications">Notifications</a></li>
+      <li class="nav-item"><a class="nav-link" href="/admin#pages">Pages</a></li>
+      <li class="nav-item"><a class="nav-link" href="/admin#modules">Modules</a></li>
+      <li class="nav-item"><a class="nav-link" href="/admin#settings">Settings</a></li>
+      <li class="nav-item"><a class="nav-link" href="/admin/deploy">Deploy</a></li>
+      <li class="nav-item"><a class="nav-link active" href="/admin/plugins">Plugins</a></li>
+    </ul>
+
+    <p class="text-muted mb-4">Plugin admin pages and registry information are rendered from the runtime plugin catalog.</p>
 
     <div class="row g-4 mb-4">
-      <div class="col-md-6">
+      <div class="col-lg-7">
         <div class="card p-4 h-100">
-          <h5 class="mb-2">Chat Notifier</h5>
-          <p class="text-muted mb-3">Configures Slack, Discord, and Telegram notifications for solves and admin announcements.</p>
-          <a class="btn btn-primary" href="/admin/plugins/chat-notifier">Open Chat Notifier Settings</a>
+          <h5 class="mb-3">Plugin Admin Menu</h5>
+          <div id="plugin-admin-menu" class="text-muted small">Loading...</div>
         </div>
       </div>
-      <div class="col-md-6">
+      <div class="col-lg-5">
         <div class="card p-4 h-100">
-          <h5 class="mb-2">Loaded Plugin Registry</h5>
-          <div id="plugin-catalog" class="text-muted small">Loading…</div>
+          <h5 class="mb-3">Loaded Plugin Registry</h5>
+          <div id="plugin-catalog" class="text-muted small">Loading...</div>
         </div>
       </div>
     </div>
@@ -59,10 +63,11 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="/static/js/api.js"></script>
+  <script src="/static/js/nav.js"></script>
   <script src="/static/js/i18n.js"></script>
   <script>
     function escHtml(s) {
-      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;');
     }
 
     async function logout() {
@@ -71,7 +76,8 @@
     }
 
     async function loadPluginCatalog() {
-      const container = document.getElementById('plugin-catalog');
+      const catalog = document.getElementById('plugin-catalog');
+      const adminMenu = document.getElementById('plugin-admin-menu');
       try {
         const plugins = await apiFetch('/api/plugins');
         const sections = [
@@ -80,24 +86,37 @@
           ['Notifiers', plugins.notifiers || []],
           ['Challenge types', plugins.challenge_types || []],
         ];
-        container.innerHTML = sections.map(([title, items]) => `
+        const entries = Array.isArray(plugins.admin_menu) ? plugins.admin_menu : [];
+
+        adminMenu.innerHTML = entries.length
+          ? entries.map(item => `
+              <div class="d-flex justify-content-between align-items-center border rounded p-3 mb-2">
+                <div>
+                  <div class="fw-semibold">${escHtml(item.title || item.name || 'Plugin page')}</div>
+                  <div class="text-muted small">${escHtml(item.route || '')}</div>
+                </div>
+                <a class="btn btn-sm btn-primary" href="${escHtml(item.route || '/admin/plugins')}">Open</a>
+              </div>
+            `).join('')
+          : '<span class="text-muted">No plugin admin pages registered.</span>';
+
+        catalog.innerHTML = sections.map(([title, items]) => `
           <div class="mb-3">
             <div class="fw-semibold mb-1">${escHtml(title)}</div>
             <div>${items.length ? items.map(item => `<span class="tag me-1 mb-1 d-inline-block">${escHtml(item)}</span>`).join(' ') : '<span class="text-muted">None loaded</span>'}</div>
           </div>
         `).join('');
       } catch (err) {
-        container.innerHTML = `<div class="text-danger">${escHtml(err.message)}</div>`;
+        adminMenu.innerHTML = `<div class="text-danger">${escHtml(err.message)}</div>`;
+        catalog.innerHTML = `<div class="text-danger">${escHtml(err.message)}</div>`;
       }
     }
 
     (async () => {
       await initI18n();
       const user = await getMe();
-      if (!user || user.role !== 'admin') {
-        location.href = '/';
-        return;
-      }
+      if (!user || user.role !== 'admin') { location.href = '/'; return; }
+      await applyModeAwareNav();
       await loadPluginCatalog();
     })();
   </script>

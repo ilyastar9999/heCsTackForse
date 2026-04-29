@@ -1,6 +1,8 @@
 package api
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"sync"
@@ -13,46 +15,69 @@ import (
 const userIDKey = "userID"
 const userRoleKey = "userRole"
 
+var errUnauthorized = errors.New("unauthorized")
+var errBanned = errors.New("banned")
+
 func (s *Server) authMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		tokenStr := ""
-		authHeader := c.Request().Header.Get("Authorization")
-		if strings.HasPrefix(authHeader, "Bearer ") {
-			tokenStr = authHeader[7:]
-		}
-		if tokenStr == "" {
-			cookie, err := c.Request().Cookie("token")
-			if err == nil {
-				tokenStr = cookie.Value
+		userID, role, err := s.authenticateRequest(c)
+		if err != nil {
+			if errors.Is(err, errBanned) {
+				return c.JSON(http.StatusForbidden, map[string]string{"error": "your account has been banned"})
 			}
-		}
-		if tokenStr == "" {
 			return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 		}
-		claims := jwt.MapClaims{}
-		token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (interface{}, error) {
-			return []byte(s.cfg.Server.SecretKey), nil
-		})
-		if err != nil || !token.Valid {
-			return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
-		}
-		userID, ok := claims["user_id"]
-		if !ok {
-			return c.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
-		}
-		role, _ := claims["role"].(string)
-		c.Set(userIDKey, int64(userID.(float64)))
+		c.Set(userIDKey, userID)
 		c.Set(userRoleKey, role)
-
-		// Deny access to banned users (DB check; fast because id is PK-indexed).
-		var banned bool
-		_ = s.db.QueryRow("SELECT COALESCE(banned, 0) FROM users WHERE id=?", int64(userID.(float64))).Scan(&banned)
-		if banned {
-			return c.JSON(http.StatusForbidden, map[string]string{"error": "your account has been banned"})
-		}
-
 		return next(c)
 	}
+}
+
+func (s *Server) authenticateRequest(c echo.Context) (int64, string, error) {
+	tokenStr := ""
+	authHeader := c.Request().Header.Get("Authorization")
+	if strings.HasPrefix(authHeader, "Bearer ") {
+		tokenStr = strings.TrimSpace(authHeader[7:])
+	}
+	if tokenStr == "" {
+		cookie, err := c.Request().Cookie("token")
+		if err == nil {
+			tokenStr = cookie.Value
+		}
+	}
+	if tokenStr == "" {
+		return 0, "", errUnauthorized
+	}
+
+	claims := jwt.MapClaims{}
+	token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (interface{}, error) {
+		if t.Method != jwt.SigningMethodHS256 {
+			return nil, fmt.Errorf("unexpected signing method: %s", t.Method.Alg())
+		}
+		return []byte(s.cfg.Server.SecretKey), nil
+	})
+	if err != nil || !token.Valid {
+		return 0, "", errUnauthorized
+	}
+
+	userIDFloat, ok := claims["user_id"].(float64)
+	if !ok || userIDFloat <= 0 {
+		return 0, "", errUnauthorized
+	}
+	role, ok := claims["role"].(string)
+	if !ok || role == "" {
+		return 0, "", errUnauthorized
+	}
+	userID := int64(userIDFloat)
+
+	// Deny access to banned users (DB check; fast because id is PK-indexed).
+	var banned bool
+	_ = s.db.QueryRow("SELECT COALESCE(banned, 0) FROM users WHERE id=?", userID).Scan(&banned)
+	if banned {
+		return 0, "", errBanned
+	}
+
+	return userID, role, nil
 }
 
 func (s *Server) adminMiddleware(next echo.HandlerFunc) echo.HandlerFunc {

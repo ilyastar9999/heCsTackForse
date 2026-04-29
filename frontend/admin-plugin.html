@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plugin Admin - heCsTackForse</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg sticky-top">
+    <div class="container-fluid px-4">
+      <a class="navbar-brand" href="/">heCsTackForse</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navMenu">
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item"><a class="nav-link" href="/challenges">Challenges</a></li>
+          <li class="nav-item"><a class="nav-link" href="/modules">Modules</a></li>
+          <li class="nav-item"><a class="nav-link" href="/scoreboard">Scoreboard</a></li>
+        </ul>
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item"><a class="nav-link active" href="/admin">Admin</a></li>
+          <li class="nav-item"><a class="nav-link" href="/profile">Profile</a></li>
+          <li class="nav-item"><a class="nav-link" href="#" onclick="logout()">Logout</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="page-container">
+    <h1 class="page-title mb-2" id="plugin-title">Plugin Admin</h1>
+
+    <ul class="nav nav-tabs mb-4">
+      <li class="nav-item"><a class="nav-link" href="/admin">Challenges</a></li>
+      <li class="nav-item"><a class="nav-link" href="/admin#users">Users</a></li>
+      <li class="nav-item"><a class="nav-link" href="/admin#notifications">Notifications</a></li>
+      <li class="nav-item"><a class="nav-link" href="/admin#pages">Pages</a></li>
+      <li class="nav-item"><a class="nav-link" href="/admin#modules">Modules</a></li>
+      <li class="nav-item"><a class="nav-link" href="/admin#settings">Settings</a></li>
+      <li class="nav-item"><a class="nav-link" href="/admin/deploy">Deploy</a></li>
+      <li class="nav-item"><a class="nav-link active" href="/admin/plugins">Plugins</a></li>
+    </ul>
+
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+      <div>
+        <p class="text-muted mb-0" id="plugin-route">Loading plugin route...</p>
+      </div>
+      <a class="btn btn-outline-secondary" href="/admin/plugins">Back to Plugins</a>
+    </div>
+
+    <div class="card p-4">
+      <div id="plugin-state" class="text-muted">Loading plugin metadata...</div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/nav.js"></script>
+  <script>
+    function escHtml(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');
+    }
+
+    async function logout() {
+      await apiFetch('/api/auth/logout', { method: 'POST' });
+      location.href = '/login';
+    }
+
+    async function loadPluginPage() {
+      const slug = location.pathname.split('/').filter(Boolean).pop() || '';
+      const title = document.getElementById('plugin-title');
+      const route = document.getElementById('plugin-route');
+      const state = document.getElementById('plugin-state');
+
+      try {
+        const user = await getMe();
+        if (!user || user.role !== 'admin') { location.href = '/'; return; }
+        await applyModeAwareNav();
+
+        const plugins = await apiFetch('/api/plugins');
+        const entries = Array.isArray(plugins.admin_menu) ? plugins.admin_menu : [];
+        const entry = entries.find(item => String(item.route || '').replace(/\/+$/, '') === '/admin/plugins/' + slug);
+        if (!entry) {
+          state.innerHTML = '<div class="text-danger">Plugin admin page is not registered.</div>';
+          return;
+        }
+
+        title.textContent = entry.title || entry.name || 'Plugin Admin';
+        route.textContent = entry.route || '/admin/plugins/' + slug;
+        state.innerHTML = `
+          <p class="mb-2">This plugin registered an admin route, but it did not ship a dedicated frontend page.</p>
+          <p class="mb-0 text-muted">Use this placeholder until a plugin-specific admin UI is added for <code>${escHtml(entry.name || slug)}</code>.</p>
+        `;
+      } catch (err) {
+        state.innerHTML = '<div class="text-danger">' + escHtml(err.message) + '</div>';
+      }
+    }
+
+    loadPluginPage();
+  </script>
+</body>
+</html>

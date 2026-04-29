@@ -2,6 +2,8 @@ package plugin
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 	"sync"
 )
 
@@ -13,6 +15,8 @@ type Registry struct {
 	flagCheckers   map[string]FlagChecker
 	notifiers      map[string]Notifier
 	challengeTypes map[string]ChallengeTypeExtension
+	homeWidgets    map[string]HomeWidget
+	adminMenu      map[string]AdminMenuEntry
 }
 
 // Default is the process-wide plugin registry.
@@ -26,6 +30,8 @@ func newRegistry() *Registry {
 		flagCheckers:   make(map[string]FlagChecker),
 		notifiers:      make(map[string]Notifier),
 		challengeTypes: make(map[string]ChallengeTypeExtension),
+		homeWidgets:    make(map[string]HomeWidget),
+		adminMenu:      make(map[string]AdminMenuEntry),
 	}
 }
 
@@ -39,6 +45,13 @@ func init() {
 	Default.RegisterFlagChecker(&RegexChecker{})
 	Default.RegisterFlagChecker(&CaseInsensitiveChecker{})
 	Default.RegisterFlagChecker(&PrefixChecker{})
+
+	// Built-in challenge types
+	Default.RegisterChallengeType(&StaticChallengeType{})
+	Default.RegisterChallengeType(&DynamicDeployChallengeType{})
+	Default.RegisterChallengeType(&PentestChallengeType{})
+	Default.RegisterChallengeType(&ADAttackChallengeType{})
+	Default.RegisterChallengeType(&ADDefenseChallengeType{})
 }
 
 // ─── Scorer ──────────────────────────────────────────────────────────────────
@@ -69,6 +82,7 @@ func (r *Registry) ScorerNames() []string {
 	for n := range r.scorers {
 		names = append(names, n)
 	}
+	sort.Strings(names)
 	return names
 }
 
@@ -104,6 +118,7 @@ func (r *Registry) FlagCheckerNames() []string {
 	for n := range r.flagCheckers {
 		names = append(names, n)
 	}
+	sort.Strings(names)
 	return names
 }
 
@@ -135,6 +150,7 @@ func (r *Registry) NotifierNames() []string {
 	for n := range r.notifiers {
 		names = append(names, n)
 	}
+	sort.Strings(names)
 	return names
 }
 
@@ -166,5 +182,99 @@ func (r *Registry) ChallengeTypeNames() []string {
 	for n := range r.challengeTypes {
 		names = append(names, n)
 	}
+	sort.Strings(names)
 	return names
+}
+
+func (r *Registry) ChallengeTypes() []ChallengeTypeSpec {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	names := make([]string, 0, len(r.challengeTypes))
+	for n := range r.challengeTypes {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+
+	specs := make([]ChallengeTypeSpec, 0, len(names))
+	for _, name := range names {
+		spec := ChallengeTypeSpec{
+			ID:                     name,
+			Title:                  humanizePluginName(name),
+			SubmissionMode:         "plugin",
+			AccessMode:             "plugin",
+			SupportsManualFlags:    true,
+			SupportsCheckerConfig:  true,
+			SupportsFiles:          true,
+			SupportsHints:          true,
+			SupportsConnectionInfo: true,
+		}
+		if describer, ok := r.challengeTypes[name].(ChallengeTypeDescriber); ok {
+			custom := describer.Descriptor()
+			if custom.ID == "" {
+				custom.ID = name
+			}
+			if custom.Title == "" {
+				custom.Title = humanizePluginName(custom.ID)
+			}
+			spec = custom
+		}
+		specs = append(specs, spec)
+	}
+	return specs
+}
+
+func (r *Registry) RegisterHomeWidget(w HomeWidget) {
+	if w.Name == "" {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.homeWidgets[w.Name] = w
+}
+
+func (r *Registry) HomeWidgets() []HomeWidget {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	widgets := make([]HomeWidget, 0, len(r.homeWidgets))
+	for _, w := range r.homeWidgets {
+		widgets = append(widgets, w)
+	}
+	sort.Slice(widgets, func(i, j int) bool { return widgets[i].Name < widgets[j].Name })
+	return widgets
+}
+
+func (r *Registry) RegisterAdminMenu(entry AdminMenuEntry) {
+	if entry.Name == "" {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.adminMenu[entry.Name] = entry
+}
+
+func (r *Registry) AdminMenu() []AdminMenuEntry {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	menu := make([]AdminMenuEntry, 0, len(r.adminMenu))
+	for _, item := range r.adminMenu {
+		menu = append(menu, item)
+	}
+	sort.Slice(menu, func(i, j int) bool { return menu[i].Route < menu[j].Route })
+	return menu
+}
+
+func humanizePluginName(name string) string {
+	if name == "" {
+		return ""
+	}
+	parts := strings.FieldsFunc(name, func(r rune) bool {
+		return r == '_' || r == '-'
+	})
+	for i, part := range parts {
+		if part == "" {
+			continue
+		}
+		parts[i] = strings.ToUpper(part[:1]) + strings.ToLower(part[1:])
+	}
+	return strings.Join(parts, " ")
 }

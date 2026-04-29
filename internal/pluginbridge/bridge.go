@@ -26,6 +26,10 @@ type Catalog struct {
 	Scorers        []string `json:"scorers"`
 	Notifiers      []string `json:"notifiers"`
 	ChallengeTypes []string `json:"challenge_types"`
+	Assets         []any    `json:"assets"`
+	AdminMenu      []any    `json:"admin_menu"`
+	UserMenu       []any    `json:"user_menu"`
+	HomeWidgets    []any    `json:"home_widgets"`
 }
 
 type Bridge struct {
@@ -234,6 +238,20 @@ type challengeTypeAdapter struct {
 func (a *challengeTypeAdapter) Name() string                { return a.name }
 func (a *challengeTypeAdapter) Init(_ map[string]any) error { return nil }
 func (a *challengeTypeAdapter) TypeID() string              { return a.name }
+func (a *challengeTypeAdapter) Descriptor() plugin.ChallengeTypeSpec {
+	return plugin.ChallengeTypeSpec{
+		ID:                     a.name,
+		Title:                  a.name,
+		Description:            "Plugin-provided challenge type.",
+		SubmissionMode:         "plugin",
+		AccessMode:             "plugin",
+		SupportsManualFlags:    true,
+		SupportsCheckerConfig:  true,
+		SupportsFiles:          true,
+		SupportsHints:          true,
+		SupportsConnectionInfo: true,
+	}
+}
 func (a *challengeTypeAdapter) Verify(challengeData, submitted string) bool {
 	var result bool
 	if err := a.bridge.call("verify_challenge_type", map[string]any{

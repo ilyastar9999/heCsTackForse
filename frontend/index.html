@@ -17,6 +17,7 @@
       <div class="collapse navbar-collapse" id="navMenu">
         <ul class="navbar-nav me-auto">
           <li class="nav-item"><a class="nav-link" data-i18n="nav.challenges" href="/challenges">Challenges</a></li>
+          <li class="nav-item"><a class="nav-link" data-i18n="nav.modules" href="/modules">Modules</a></li>
           <li class="nav-item"><a class="nav-link" data-i18n="nav.scoreboard" href="/scoreboard">Scoreboard</a></li>
           <li class="nav-item" id="nav-notifications-li" style="display:none">
             <a class="nav-link bell-indicator" href="/notifications"><span aria-hidden="true">🔔</span> <span data-i18n="nav.notifications">Notifications</span></a>
@@ -49,8 +50,14 @@
     </div>
   </div>
 
+  <section class="page-container pt-0" id="plugin-home-section" style="display:none">
+    <div class="section-kicker">Platform extensions</div>
+    <div class="plugin-widget-grid" id="plugin-home-widgets"></div>
+  </section>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="/static/js/api.js"></script>
+  <script src="/static/js/nav.js"></script>
   <script src="/static/js/i18n.js"></script>
   <script>
     initI18n();
@@ -62,14 +69,39 @@
         document.getElementById('nav-login-li').style.display = 'none';
         document.getElementById('nav-register-li').style.display = 'none';
         document.getElementById('nav-logout-li').style.display = '';
-        document.getElementById('nav-notifications-li').style.display = '';
+        await applyModeAwareNav();
         document.getElementById('hero-register').style.display = 'none';
         if (user.role === 'admin') document.getElementById('nav-admin').style.display = '';
       }
+      await loadPluginWidgets();
     })();
     async function logout() {
       await apiFetch('/api/auth/logout', { method: 'POST' });
       location.reload();
+    }
+    async function loadPluginWidgets() {
+      const data = await apiFetch('/api/plugins').catch(() => null);
+      if (!data) return;
+      const widgets = Array.isArray(data.home_widgets) ? data.home_widgets : [];
+      if (!widgets.length && Array.isArray(data.notifiers) && data.notifiers.includes('chat_notifier')) {
+        widgets.push({
+          name: 'chat_notifier',
+          title: 'Chat Notifier',
+          body: 'Solve and announcement notifications can be sent to Slack, Discord, or Telegram.',
+          url: '/admin/plugins/chat-notifier',
+        });
+      }
+      if (!widgets.length) return;
+      const root = document.getElementById('plugin-home-widgets');
+      root.innerHTML = widgets.map(w => `
+        <article class="plugin-widget-card">
+          <div class="plugin-widget-name">${escHtml(w.name || 'plugin')}</div>
+          <h2>${escHtml(w.title || w.name || 'Plugin')}</h2>
+          <p>${escHtml(w.body || '')}</p>
+          ${w.url ? `<a class="btn btn-sm btn-outline-primary" href="${escHtml(w.url)}">Open</a>` : ''}
+        </article>
+      `).join('');
+      document.getElementById('plugin-home-section').style.display = '';
     }
   </script>
 </body>

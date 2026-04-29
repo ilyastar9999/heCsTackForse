@@ -75,10 +75,11 @@ async function loadTheme() {
     }
 
     const vars = theme.vars || {};
-    if (Object.keys(vars).length > 0) {
+    const safeVars = Object.fromEntries(Object.entries(vars).filter(([k]) => /^--ctf-[a-z0-9-]+$/i.test(k)));
+    if (Object.keys(safeVars).length > 0) {
       const style = document.createElement('style');
       style.id = 'ctf-theme-override';
-      style.textContent = ':root {' + Object.entries(vars).map(([k, v]) => `${k}:${v}`).join(';') + '}';
+      style.textContent = ':root {' + Object.entries(safeVars).map(([k, v]) => `${k}:${String(v).replace(/[{};]/g, '')}`).join(';') + '}';
       document.head.appendChild(style);
     }
 
@@ -89,12 +90,8 @@ async function loadTheme() {
       document.head.appendChild(customCss);
     }
 
-    if (theme.custom_js) {
-      const script = document.createElement('script');
-      script.id = 'ctf-theme-custom-js';
-      script.text = theme.custom_js;
-      document.head.appendChild(script);
-    }
+    // Deliberately do not execute server-provided custom JS. Admin-controlled
+    // code execution is still XSS once an admin browser is compromised.
   } catch (_) { /* ignore */ }
 }
 
@@ -110,7 +107,7 @@ function normalizeThemeConfig(raw) {
     name: typeof raw.name === 'string' && raw.name ? raw.name : 'default',
     vars: raw.vars && typeof raw.vars === 'object' ? raw.vars : {},
     custom_css: typeof raw.custom_css === 'string' ? raw.custom_css : '',
-    custom_js: typeof raw.custom_js === 'string' ? raw.custom_js : '',
+    custom_js: '',
   };
 }
 

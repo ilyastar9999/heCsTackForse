@@ -39,9 +39,9 @@ func normalizeThemePayload(raw map[string]any) themeConfig {
 	if css, ok := raw["custom_css"].(string); ok {
 		cfg.CustomCSS = css
 	}
-	if js, ok := raw["custom_js"].(string); ok {
-		cfg.CustomJS = js
-	}
+	// custom_js is intentionally ignored. Executing database-provided JavaScript
+	// turns every stored theme edit into persistent XSS.
+	cfg.CustomJS = ""
 
 	if varsRaw, ok := raw["vars"].(map[string]any); ok {
 		for k, v := range varsRaw {
@@ -101,7 +101,7 @@ func (s *Server) handleAdminSetConfig(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
 	}
 	allowed := map[string]bool{
-		"ctf_name": true, "ctf_description": true, "description": true, "ctf_start": true,
+		"ctf_name": true, "ctf_mode": true, "language": true, "ctf_description": true, "description": true, "ctf_start": true,
 		"ctf_end": true, "registration_open": true, "theme": true, "team_mode": true,
 		"ctf_theme": true, "theme_header": true, "theme_footer": true, "theme_settings": true,
 		"domain_whitelist": true, "verify_emails": true, "team_creation": true, "team_size": true,

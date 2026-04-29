@@ -22,6 +22,31 @@ async function getMe() {
   }
 }
 
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function sanitizeHtml(html) {
+  const template = document.createElement('template');
+  template.innerHTML = String(html || '');
+  template.content.querySelectorAll('script, iframe, object, embed, link, meta').forEach(el => el.remove());
+  template.content.querySelectorAll('*').forEach(el => {
+    [...el.attributes].forEach(attr => {
+      const name = attr.name.toLowerCase();
+      const value = String(attr.value || '').trim().toLowerCase();
+      if (name.startsWith('on') || value.startsWith('javascript:') || value.startsWith('data:text/html')) {
+        el.removeAttribute(attr.name);
+      }
+    });
+  });
+  return template.innerHTML;
+}
+
 // Namespace object used by ad.html and other pages
 const api = {
   async me() { return getMe(); },
