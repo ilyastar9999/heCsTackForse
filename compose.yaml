@@ -1,12 +1,10 @@
 services:
-
-  # ── PostgreSQL ──────────────────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: ctf
-      POSTGRES_PASSWORD: ctf
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
       POSTGRES_DB: ctf
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -16,22 +14,29 @@ services:
       timeout: 5s
       retries: 10
 
-  # ── CTF platform ────────────────────────────────────────────────────────────
   app:
     build: .
     restart: unless-stopped
     ports:
-      - "8000:8080"
+      - "${APP_PORT:-8000}:8080"
     volumes:
-      # Config file — edit docker/config.yaml before first run
-      - ./config.yaml:/app/config.yaml:ro
-      # Writable volume for A&D sploit temp files
+      - ./docker/config.yaml:/app/config.yaml:ro
+      - ./challenges:/app/challenges:ro
+      - ./themes:/app/themes:ro
       - sploits:/tmp/sploits
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      TZ: UTC
+      TZ: ${TZ:-UTC}
+      APP_SECRET: ${APP_SECRET:-change-me-generate-a-long-random-string}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/api/config >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
 volumes:
   postgres_data:

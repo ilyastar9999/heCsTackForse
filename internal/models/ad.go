@@ -9,6 +9,7 @@ type Sploit struct {
 	ID          int64      `json:"id"`
 	TeamID      int64      `json:"team_id"`
 	ChallengeID int64      `json:"challenge_id"`
+	BucketKey   string     `json:"bucket_key,omitempty"`
 	Name        string     `json:"name"`
 	Language    string     `json:"language"` // python3, bash, ...
 	Script      string     `json:"script,omitempty"`
@@ -24,6 +25,8 @@ type SploitResult struct {
 	SploitID       int64     `json:"sploit_id"`
 	TargetTeamID   int64     `json:"target_team_id"`
 	Round          int64     `json:"round"`
+	BucketKey      string    `json:"bucket_key,omitempty"`
+	AwardedPoints  int       `json:"awarded_points"`
 	Stdout         string    `json:"stdout,omitempty"`
 	FlagsCaptured  int       `json:"flags_captured"`
 	FlagsSubmitted int       `json:"flags_submitted"`
@@ -33,12 +36,15 @@ type SploitResult struct {
 
 // VPNPeer stores the WireGuard keypair and IP allocation for a team.
 type VPNPeer struct {
-	ID         int64     `json:"id"`
-	TeamID     int64     `json:"team_id"`
-	PrivateKey string    `json:"-"` // never sent to clients
-	PublicKey  string    `json:"public_key"`
-	AllowedIP  string    `json:"allowed_ip"` // e.g. 10.8.1.0/24
-	CreatedAt  time.Time `json:"created_at"`
+	ID            int64      `json:"id"`
+	TeamID        int64      `json:"team_id"`
+	PrivateKey    string     `json:"-"` // never sent to clients
+	PublicKey     string     `json:"public_key"`
+	AllowedIP     string     `json:"allowed_ip"` // e.g. 10.8.1.0/24
+	Provisioned   bool       `json:"provisioned"`
+	LastSyncError string     `json:"last_sync_error,omitempty"`
+	SyncedAt      *time.Time `json:"synced_at,omitempty"`
+	CreatedAt     time.Time  `json:"created_at"`
 }
 
 // ADRound represents a completed or in-progress A&D round.
@@ -51,10 +57,12 @@ type ADRound struct {
 
 // ADServiceStatus holds the checker result for one team's service in one round.
 type ADServiceStatus struct {
-	ChallengeID int64     `json:"challenge_id"`
-	TeamID      int64     `json:"team_id"`
-	Status      string    `json:"status"` // up / down / corrupt
-	Round       int64     `json:"round"`
-	Score       int       `json:"score"`
-	CheckedAt   time.Time `json:"checked_at"`
+	ChallengeID   int64     `json:"challenge_id"`
+	ChallengeName string    `json:"challenge_name,omitempty"`
+	TeamID        int64     `json:"team_id"`
+	Status        string    `json:"status"` // up / down / corrupt
+	Round         int64     `json:"round"`
+	Score         int       `json:"score"`
+	MaxScore      int       `json:"max_score,omitempty"`
+	CheckedAt     time.Time `json:"checked_at"`
 }

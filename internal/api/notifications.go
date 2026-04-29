@@ -7,6 +7,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/ilyastar9999/heCsTackForse/internal/models"
+	"github.com/ilyastar9999/heCsTackForse/internal/plugin"
 )
 
 func (s *Server) handleListNotifications(c echo.Context) error {
@@ -51,7 +52,45 @@ func (s *Server) handleAdminCreateNotification(c echo.Context) error {
 	var n models.Notification
 	_ = s.db.QueryRow(`SELECT id, title, content, created_by, created_at FROM notifications WHERE id=?`, id).
 		Scan(&n.ID, &n.Title, &n.Content, &n.CreatedBy, &n.CreatedAt)
+	go s.notifyAnnouncement(req.Title, req.Content)
 	return c.JSON(http.StatusCreated, n)
+}
+
+func (s *Server) notifyAnnouncement(title, content string) {
+	settings := s.loadNotifierSettings()
+	if !settings.bool("notifier_send_notifications") {
+		return
+	}
+	notifierName := settings.str("notifier_type")
+	n, err := plugin.Default.GetNotifier(notifierName)
+	if err != nil || n == nil {
+		notifiers := plugin.Default.NotifierNames()
+		if len(notifiers) == 0 {
+			return
+		}
+		n, err = plugin.Default.GetNotifier(notifiers[0])
+		if err != nil || n == nil {
+			return
+		}
+	}
+	message := title
+	if content != "" {
+		message = title + "\n" + content
+	}
+	_ = n.Notify(plugin.Event{
+		Type: "announcement",
+		Data: map[string]any{
+			"title":                        title,
+			"content":                      content,
+			"message":                      message,
+			"notifier_type":                settings.str("notifier_type"),
+			"notifier_send_notifications":  settings.bool("notifier_send_notifications"),
+			"notifier_slack_webhook_url":   settings.str("notifier_slack_webhook_url"),
+			"notifier_discord_webhook_url": settings.str("notifier_discord_webhook_url"),
+			"notifier_telegram_bot_token":  settings.str("notifier_telegram_bot_token"),
+			"notifier_telegram_chat_id":    settings.str("notifier_telegram_chat_id"),
+		},
+	})
 }
 
 func (s *Server) handleAdminDeleteNotification(c echo.Context) error {

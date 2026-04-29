@@ -1,0 +1,130 @@
+/* Compatibility layer for heCsTackForse-specific markup.
+   It deliberately stays thin so the upstream theme remains dominant. */
+
+body {
+  background-color: var(--bs-body-bg, inherit);
+  color: var(--bs-body-color, inherit);
+}
+
+.ctf-hero,
+.auth-page {
+  background: inherit;
+  color: inherit;
+}
+
+.ctf-hero h1,
+.ctf-hero p,
+.page-title,
+.plugin-widget-card h2,
+.notification-card .notif-title,
+.stat-card .stat-value,
+.module-header h2,
+.module-theory h3 {
+  color: inherit;
+}
+
+.page-container {
+  max-width: 1200px;
+}
+
+.page-container::before {
+  display: none;
+}
+
+.challenge-card,
+.plugin-widget-card,
+.auth-card,
+.notification-card,
+.stat-card,
+.round-card,
+.modules-sidebar,
+.module-assignments,
+.module-header,
+.module-topic,
+.module-assignment,
+.instance-box {
+  background: var(--bs-card-bg, rgba(0, 0, 0, 0.14));
+  color: inherit;
+  border: 1px solid var(--bs-border-color, rgba(255, 255, 255, 0.15));
+  box-shadow: var(--bs-box-shadow, none);
+}
+
+.challenge-card:hover,
+.plugin-widget-card:hover,
+.notification-card:hover,
+.stat-card:hover,
+.module-topic:hover,
+.module-topic.active,
+.module-assignment:hover {
+  color: inherit;
+  border-color: var(--bs-primary, currentColor);
+}
+
+.challenge-card .points,
+.plugin-widget-name,
+.round-number,
+.auth-card .auth-logo span,
+.profile-avatar {
+  color: var(--bs-primary, inherit);
+}
+
+.profile-avatar {
+  background: var(--bs-primary, rgba(255, 255, 255, 0.2));
+}
+
+.scoreboard-table th,
+.scoreboard-table td,
+.admin-table th,
+.admin-table td {
+  border-bottom: 1px solid var(--bs-border-color, rgba(255, 255, 255, 0.15));
+}
+
+.scoreboard-table thead th,
+.admin-table thead th {
+  background: var(--bs-tertiary-bg, rgba(0, 0, 0, 0.14));
+}
+
+.modal-content,
+.modal-header,
+.modal-footer {
+  color: inherit;
+}
+
+.module-theory-tabs button {
+  color: inherit;
+  background: var(--bs-tertiary-bg, rgba(0, 0, 0, 0.1));
+  border: 1px solid var(--bs-border-color, rgba(255, 255, 255, 0.15));
+}
+
+.module-theory-tabs button.active,
+.module-theory-tabs button:hover {
+  border-color: var(--bs-primary, currentColor);
+}
+
+.markdown-body,
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body p,
+.markdown-body li {
+  color: inherit;
+}
+
+.markdown-body code,
+.markdown-body pre,
+.connection-info-block {
+  background: var(--bs-tertiary-bg, rgba(0, 0, 0, 0.18));
+  color: inherit;
+}
+
+.file-item,
+.hint-item,
+.tag,
+.tag-badge {
+  color: inherit;
+}
+
+.bell-indicator .badge-dot {
+  background: var(--bs-danger, #dc3545);
+}
+

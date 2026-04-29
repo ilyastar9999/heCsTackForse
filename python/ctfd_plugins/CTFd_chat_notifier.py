@@ -116,3 +116,15 @@ class ChatNotifier:
 
 def register(registry):
 	registry.register_notifier(ChatNotifier())
+
+
+def load(app):
+	"""CTFd-style entrypoint supported by heCsTackForse's Python bridge."""
+	app.register_notifier(ChatNotifier())
+	app.register_admin_menu("chat_notifier", "Chat Notifier", "/admin/plugins/chat-notifier")
+	app.register_home_widget(
+		"chat_notifier",
+		"Chat Notifier",
+		"Solve and announcement notifications can be sent to Slack, Discord, or Telegram.",
+		"/admin/plugins/chat-notifier",
+	)

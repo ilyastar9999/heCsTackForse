@@ -17,6 +17,7 @@
       <div class="collapse navbar-collapse" id="navMenu">
         <ul class="navbar-nav me-auto">
           <li class="nav-item"><a class="nav-link" data-i18n="nav.challenges" href="/challenges">Challenges</a></li>
+          <li class="nav-item"><a class="nav-link" data-i18n="nav.modules" href="/modules">Modules</a></li>
           <li class="nav-item"><a class="nav-link" data-i18n="nav.scoreboard" href="/scoreboard">Scoreboard</a></li>
         </ul>
         <ul class="navbar-nav ms-auto">
@@ -45,6 +46,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="/static/js/api.js"></script>
+  <script src="/static/js/marked.min.js"></script>
   <script src="/static/js/i18n.js"></script>
   <script>
     async function logout() {
@@ -80,10 +82,11 @@
       try {
         const page = await apiFetch('/api/pages/' + encodeURIComponent(slug));
         document.title = escHtml(page.title) + ' – heCsTackForse';
+        const rendered = window.marked ? marked.parse(page.content || '') : escHtml(page.content || '');
         container.innerHTML = `
           <h1 class="page-title">${escHtml(page.title)}</h1>
           <div class="card p-4">
-            <div id="page-body" style="color:var(--ctf-text);line-height:1.7">${page.content || ''}</div>
+            <div id="page-body" class="markdown-body">${sanitizeHtml(rendered)}</div>
           </div>`;
       } catch (err) {
         container.innerHTML = `<div class="alert alert-danger">${t('pages.not_found')}</div>`;

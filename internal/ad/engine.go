@@ -33,6 +33,7 @@ import (
 
 	"github.com/ilyastar9999/heCsTackForse/internal/config"
 	"github.com/ilyastar9999/heCsTackForse/internal/db"
+	"github.com/ilyastar9999/heCsTackForse/internal/models"
 )
 
 // flagRE matches the default FLAG{…} format; the engine also tries to detect
@@ -95,6 +96,35 @@ func (e *Engine) Stop() {
 // CurrentRound returns the last completed round number.
 func (e *Engine) CurrentRound() int64 {
 	return e.currentRound.Load()
+}
+
+// ProbeService executes the configured defense checks for a single running
+// service instance and returns the result without persisting score changes.
+func (e *Engine) ProbeService(challengeID, teamID int64, challengeType, checkerConfig, connectionInfoJSON string) (models.ADServiceStatus, error) {
+	timeout, _ := time.ParseDuration(e.cfg.AD.CheckerTimeout)
+	if timeout <= 0 {
+		timeout = 30 * time.Second
+	}
+
+	var connInfo map[string]any
+	if err := json.Unmarshal([]byte(connectionInfoJSON), &connInfo); err != nil {
+		return models.ADServiceStatus{}, fmt.Errorf("invalid connection info")
+	}
+	host, _ := connInfo["host"].(string)
+	port, _ := connInfo["port"].(string)
+	if strings.TrimSpace(host) == "" {
+		return models.ADServiceStatus{}, fmt.Errorf("service host is not available")
+	}
+
+	status, score := e.runChallengeChecks(challengeID, challengeType, checkerConfig, host, port, timeout)
+	return models.ADServiceStatus{
+		ChallengeID: challengeID,
+		TeamID:      teamID,
+		Status:      status,
+		Round:       e.CurrentRound(),
+		Score:       score,
+		CheckedAt:   time.Now(),
+	}, nil
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -189,8 +219,9 @@ func (e *Engine) runCheckers(round int64) {
 	}
 
 	rows, err := e.db.Query(`
-		SELECT i.id, i.challenge_id, i.team_id, i.connection_info
+		SELECT i.id, i.challenge_id, i.team_id, i.connection_info, ch.challenge_type, ch.checker_config
 		FROM instances i
+		JOIN challenges ch ON ch.id = i.challenge_id
 		WHERE i.status='running'
 	`)
 	if err != nil {
@@ -200,18 +231,12 @@ func (e *Engine) runCheckers(round int64) {
 	defer rows.Close()
 
 	for rows.Next() {
-		var instanceID int64
 		var challengeID int64
 		var teamID sql.NullInt64
 		var connInfoJSON string
-		if err := rows.Scan(&instanceID, &challengeID, &teamID, &connInfoJSON); err != nil {
-			continue
-		}
-
-		script := e.checkerScriptForChallenge(challengeID)
-		if script == "" {
-			// No checker configured — assume up.
-			e.recordServiceStatus(challengeID, teamID.Int64, "up", round, 1)
+		var challengeType string
+		var checkerConfig string
+		if err := rows.Scan(new(int64), &challengeID, &teamID, &connInfoJSON, &challengeType, &checkerConfig); err != nil {
 			continue
 		}
 
@@ -220,9 +245,48 @@ func (e *Engine) runCheckers(round int64) {
 		host, _ := connInfo["host"].(string)
 		port, _ := connInfo["port"].(string)
 
-		status, score := e.execChecker(script, host, port, timeout)
+		status, score := e.runChallengeChecks(challengeID, challengeType, checkerConfig, host, port, timeout)
 		e.recordServiceStatus(challengeID, teamID.Int64, status, round, score)
 	}
+}
+
+func (e *Engine) runChallengeChecks(challengeID int64, challengeType, checkerConfig, host, port string, timeout time.Duration) (status string, score int) {
+	if challengeType == "attack_defence_defense" {
+		var cfg models.ADCheckerConfig
+		_ = json.Unmarshal([]byte(checkerConfig), &cfg)
+		if len(cfg.DefenseChecks) > 0 {
+			total := 0
+			earned := 0
+			for i, check := range cfg.DefenseChecks {
+				points := check.Points
+				if points <= 0 {
+					points = 1
+				}
+				total += points
+				st, _ := e.execChecker(check.Script, host, port, timeout)
+				if st == "up" {
+					earned += points
+				}
+				if check.Key == "" {
+					cfg.DefenseChecks[i].Key = fmt.Sprintf("check_%d", i+1)
+				}
+			}
+			switch {
+			case earned == 0:
+				return "down", 0
+			case earned < total:
+				return "corrupt", earned
+			default:
+				return "up", earned
+			}
+		}
+	}
+
+	script := e.checkerScriptForChallenge(challengeID)
+	if script == "" {
+		return "up", 1
+	}
+	return e.execChecker(script, host, port, timeout)
 }
 
 // execChecker runs a checker script and returns service status + score.
@@ -272,7 +336,7 @@ func (e *Engine) recordServiceStatus(challengeID, teamID int64, status string, r
 	)
 	// Award defence points to the team's score if service is up
 	if score > 0 {
-		_, _ = e.db.Exec(`UPDATE teams SET score=score+1 WHERE id=?`, teamID)
+		_, _ = e.db.Exec(`UPDATE teams SET score=score+? WHERE id=?`, score, teamID)
 	}
 }
 
@@ -289,7 +353,7 @@ func (e *Engine) runSploits(round int64) {
 
 	// Fetch enabled sploits
 	sploitRows, err := e.db.Query(`
-		SELECT id, team_id, challenge_id, language, script
+		SELECT id, team_id, challenge_id, bucket_key, language, script
 		FROM ad_sploits WHERE enabled
 	`)
 	if err != nil {
@@ -298,12 +362,13 @@ func (e *Engine) runSploits(round int64) {
 	}
 	type sploitRec struct {
 		id, teamID, challengeID int64
+		bucketKey               string
 		language, script        string
 	}
 	var sploits []sploitRec
 	for sploitRows.Next() {
 		var s sploitRec
-		if err := sploitRows.Scan(&s.id, &s.teamID, &s.challengeID, &s.language, &s.script); err != nil {
+		if err := sploitRows.Scan(&s.id, &s.teamID, &s.challengeID, &s.bucketKey, &s.language, &s.script); err != nil {
 			continue
 		}
 		sploits = append(sploits, s)
@@ -327,28 +392,41 @@ func (e *Engine) runSploits(round int64) {
 	for _, sp := range sploits {
 		sp := sp
 		// Get all running instances for this challenge except the sploit-owner's team
-		instRows, err := e.db.Query(`
-			SELECT i.team_id, i.connection_info
-			FROM instances i
-			WHERE i.challenge_id=? AND i.status='running' AND (i.team_id IS NULL OR i.team_id != ?)
-		`, sp.challengeID, sp.teamID)
+		var instRows *sql.Rows
+		if sp.challengeID == 0 {
+			instRows, err = e.db.Query(`
+				SELECT i.challenge_id, i.team_id, i.connection_info
+				FROM instances i
+				JOIN challenges ch ON ch.id = i.challenge_id
+				WHERE i.status='running' AND ch.challenge_type='attack_defence_attack' AND (i.team_id IS NULL OR i.team_id != ?)
+			`, sp.teamID)
+		} else {
+			instRows, err = e.db.Query(`
+				SELECT i.challenge_id, i.team_id, i.connection_info
+				FROM instances i
+				JOIN challenges ch ON ch.id = i.challenge_id
+				WHERE i.challenge_id=? AND i.status='running' AND ch.challenge_type='attack_defence_attack' AND (i.team_id IS NULL OR i.team_id != ?)
+			`, sp.challengeID, sp.teamID)
+		}
 		if err != nil {
 			continue
 		}
 		type target struct {
-			teamID   int64
-			connInfo map[string]any
+			challengeID int64
+			teamID      int64
+			connInfo    map[string]any
 		}
 		var targets []target
 		for instRows.Next() {
+			var challengeID int64
 			var tid sql.NullInt64
 			var connJSON string
-			if err := instRows.Scan(&tid, &connJSON); err != nil {
+			if err := instRows.Scan(&challengeID, &tid, &connJSON); err != nil {
 				continue
 			}
 			var info map[string]any
 			_ = json.Unmarshal([]byte(connJSON), &info)
-			targets = append(targets, target{teamID: tid.Int64, connInfo: info})
+			targets = append(targets, target{challengeID: challengeID, teamID: tid.Int64, connInfo: info})
 		}
 		instRows.Close()
 
@@ -365,12 +443,16 @@ func (e *Engine) runSploits(round int64) {
 				if runErr != nil {
 					errStr = runErr.Error()
 				}
+				awardedPoints := 0
+				if len(flags) > 0 {
+					awardedPoints = e.attackBucketPoints(t.challengeID, sp.bucketKey)
+				}
 				// Record result
 				_, _ = e.db.Exec(`
 					INSERT INTO ad_sploit_results
-						(sploit_id, target_team_id, round, stdout, flags_captured, error, ran_at)
-					VALUES (?, ?, ?, ?, ?, ?, ?)`,
-					sp.id, t.teamID, round, stdout, len(flags), errStr, time.Now(),
+						(sploit_id, target_team_id, round, bucket_key, awarded_points, stdout, flags_captured, error, ran_at)
+					VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+					sp.id, t.teamID, round, sp.bucketKey, awardedPoints, stdout, len(flags), errStr, time.Now(),
 				)
 				// Update sploit last_run_at
 				_, _ = e.db.Exec(`UPDATE ad_sploits SET last_run_at=? WHERE id=?`, time.Now(), sp.id)
@@ -388,6 +470,29 @@ func (e *Engine) runSploits(round int64) {
 	if len(capturedFlags) > 0 {
 		e.submitFlagsToServer(capturedFlags, round)
 	}
+}
+
+func (e *Engine) attackBucketPoints(challengeID int64, bucketKey string) int {
+	if bucketKey == "" {
+		return 1
+	}
+	var checkerConfig string
+	if err := e.db.QueryRow(`SELECT checker_config FROM challenges WHERE id=?`, challengeID).Scan(&checkerConfig); err != nil {
+		return 1
+	}
+	var cfg models.ADCheckerConfig
+	if err := json.Unmarshal([]byte(checkerConfig), &cfg); err != nil {
+		return 1
+	}
+	for _, bucket := range cfg.Buckets() {
+		if bucket.Key == bucketKey {
+			if bucket.Points > 0 {
+				return bucket.Points
+			}
+			return 1
+		}
+	}
+	return 1
 }
 
 // execSploit writes the script to a temp file, runs it with HOST/PORT env vars,

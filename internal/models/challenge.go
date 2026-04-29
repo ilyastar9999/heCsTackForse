@@ -9,7 +9,9 @@ type Challenge struct {
 	Category       string    `json:"category" db:"category"`
 	Points         int       `json:"points" db:"points"`
 	Flag           string    `json:"flag,omitempty" db:"flag"`
+	ChallengeType  string    `json:"challenge_type" db:"challenge_type"`
 	FlagType       string    `json:"flag_type" db:"flag_type"`
+	CheckerConfig  string    `json:"checker_config" db:"checker_config"`
 	DeployType     string    `json:"deploy_type" db:"deploy_type"`
 	DeployBackend  string    `json:"deploy_backend" db:"deploy_backend"`
 	DeployConfig   string    `json:"deploy_config" db:"deploy_config"`

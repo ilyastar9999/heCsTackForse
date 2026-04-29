@@ -15,6 +15,7 @@ import json
 import pathlib
 import sys
 import traceback
+import types
 from types import SimpleNamespace
 from typing import Any
 
@@ -61,6 +62,10 @@ class Registry:
         self.scorers: dict[str, Any] = {}
         self.notifiers: dict[str, Any] = {}
         self.challenge_types: dict[str, Any] = {}
+        self.assets: list[dict[str, Any]] = []
+        self.admin_menu: list[dict[str, Any]] = []
+        self.user_menu: list[dict[str, Any]] = []
+        self.home_widgets: list[dict[str, Any]] = []
 
     def register_flag_checker(self, plugin: Any) -> None:
         self.flag_checkers[self._name_for(plugin)] = self._init_plugin(plugin)
@@ -104,6 +109,93 @@ class Registry:
         return plugin
 
 
+class BridgeApp:
+    """Small CTFd-compatible app shim passed to plugin load(app) functions."""
+
+    def __init__(self, registry: Registry) -> None:
+        self.registry = registry
+        self.config: dict[str, Any] = {}
+        self.routes: list[dict[str, Any]] = []
+
+    def route(self, rule: str, **options):
+        def decorator(func):
+            self.routes.append({"rule": rule, "endpoint": getattr(func, "__name__", rule), "options": options})
+            return func
+
+        return decorator
+
+    def register_flag_checker(self, plugin: Any) -> None:
+        self.registry.register_flag_checker(plugin)
+
+    def register_scorer(self, plugin: Any) -> None:
+        self.registry.register_scorer(plugin)
+
+    def register_notifier(self, plugin: Any) -> None:
+        self.registry.register_notifier(plugin)
+
+    def register_challenge_type(self, plugin: Any) -> None:
+        self.registry.register_challenge_type(plugin)
+
+    def register_home_widget(self, name: str, title: str, body: str = "", url: str = "") -> None:
+        self.registry.home_widgets.append({"name": name, "title": title, "body": body, "url": url})
+
+    def register_admin_menu(self, name: str, title: str, route: str) -> None:
+        self.registry.admin_menu.append({"name": name, "title": title, "route": route})
+
+
+def install_ctfd_shims(registry: Registry) -> None:
+    """Install lightweight modules for common CTFd plugin imports.
+
+    The bridge does not run Flask. These shims let simple plugins load and
+    expose metadata/assets while platform integrations register explicit bridge
+    adapters for runtime behaviour.
+    """
+
+    ctfd = sys.modules.setdefault("CTFd", types.ModuleType("CTFd"))
+
+    plugins_mod = types.ModuleType("CTFd.plugins")
+
+    def register_plugin_assets_directory(_app=None, base_path="", endpoint=None, **_kwargs):
+        registry.assets.append({"type": "directory", "base_path": base_path, "endpoint": endpoint})
+
+    def register_plugin_asset(_app=None, asset_path="", **_kwargs):
+        registry.assets.append({"type": "file", "asset_path": asset_path})
+
+    def register_admin_plugin_menu_bar(title, route):
+        key = str(title).strip().lower().replace(" ", "_")
+        registry.admin_menu.append({"name": key, "title": title, "route": route})
+
+    def register_user_page_menu_bar(title, route):
+        registry.user_menu.append({"title": title, "route": route})
+
+    plugins_mod.register_plugin_assets_directory = register_plugin_assets_directory
+    plugins_mod.register_plugin_asset = register_plugin_asset
+    plugins_mod.register_admin_plugin_menu_bar = register_admin_plugin_menu_bar
+    plugins_mod.register_user_page_menu_bar = register_user_page_menu_bar
+    sys.modules["CTFd.plugins"] = plugins_mod
+    setattr(ctfd, "plugins", plugins_mod)
+
+    utils_mod = types.ModuleType("CTFd.utils")
+    config_store: dict[str, Any] = {}
+    utils_mod.get_config = lambda key, default=None: config_store.get(key, default)
+    utils_mod.set_config = lambda key, value: config_store.__setitem__(key, value)
+    sys.modules["CTFd.utils"] = utils_mod
+    setattr(ctfd, "utils", utils_mod)
+
+    decorators_mod = types.ModuleType("CTFd.utils.decorators")
+    decorators_mod.admins_only = lambda f: f
+    decorators_mod.authed_only = lambda f: f
+    decorators_mod.during_ctf_time_only = lambda f: f
+    decorators_mod.require_verified_emails = lambda f: f
+    decorators_mod.bypass_csrf_protection = lambda f: f
+    sys.modules["CTFd.utils.decorators"] = decorators_mod
+
+    models_mod = types.ModuleType("CTFd.models")
+    models_mod.db = SimpleNamespace(session=SimpleNamespace(add=lambda *_: None, commit=lambda: None))
+    sys.modules["CTFd.models"] = models_mod
+    setattr(ctfd, "models", models_mod)
+
+
 def _load_module(path: pathlib.Path):
     module_name = f"ctfd_bridge_{path.stem}_{abs(hash(str(path)))}"
     spec = importlib.util.spec_from_file_location(module_name, path)
@@ -116,6 +208,10 @@ def _load_module(path: pathlib.Path):
 
 
 def _load_registry_from_module(module, registry: Registry) -> None:
+    if hasattr(module, "load") and callable(module.load):
+        module.load(BridgeApp(registry))
+        # Continue scanning decorators too; hybrid plugins are cheap to support.
+
     if hasattr(module, "register") and callable(module.register):
         module.register(registry)
         return
@@ -137,6 +233,7 @@ def _load_registry_from_module(module, registry: Registry) -> None:
 
 def load_plugins(plugin_dirs: list[str], modules: list[str]) -> Registry:
     registry = Registry()
+    install_ctfd_shims(registry)
     for entry in modules:
         module_path = pathlib.Path(entry)
         if module_path.exists():
@@ -178,6 +275,10 @@ def serve(registry: Registry) -> None:
                     "scorers": sorted(registry.scorers.keys()),
                     "notifiers": sorted(registry.notifiers.keys()),
                     "challenge_types": sorted(registry.challenge_types.keys()),
+                    "assets": registry.assets,
+                    "admin_menu": registry.admin_menu,
+                    "user_menu": registry.user_menu,
+                    "home_widgets": registry.home_widgets,
                 }
             elif op == "check_flag":
                 plugin = registry.flag_checkers[params["name"]]

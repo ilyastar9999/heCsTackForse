@@ -32,6 +32,41 @@ type Event struct {
 	Data map[string]any
 }
 
+type HomeWidget struct {
+	Name  string `json:"name"`
+	Title string `json:"title"`
+	Body  string `json:"body"`
+	URL   string `json:"url,omitempty"`
+}
+
+type AdminMenuEntry struct {
+	Name  string `json:"name"`
+	Title string `json:"title"`
+	Route string `json:"route"`
+}
+
+type ChallengeTypeSpec struct {
+	ID                     string `json:"id"`
+	Title                  string `json:"title"`
+	Description            string `json:"description,omitempty"`
+	SubmissionMode         string `json:"submission_mode"`
+	AccessMode             string `json:"access_mode"`
+	DefaultDeployType      string `json:"default_deploy_type,omitempty"`
+	RequiresDeploy         bool   `json:"requires_deploy"`
+	SupportsManualFlags    bool   `json:"supports_manual_flags"`
+	SupportsCheckerConfig  bool   `json:"supports_checker_config"`
+	SupportsFiles          bool   `json:"supports_files"`
+	SupportsHints          bool   `json:"supports_hints"`
+	SupportsConnectionInfo bool   `json:"supports_connection_info"`
+	SupportsVPN            bool   `json:"supports_vpn"`
+	SupportsExploitUpload  bool   `json:"supports_exploit_upload"`
+	EngineManaged          bool   `json:"engine_managed"`
+}
+
+type ChallengeTypeDescriber interface {
+	Descriptor() ChallengeTypeSpec
+}
+
 // Scorer calculates the points awarded to a user for solving a challenge.
 // Register custom implementations via Default.RegisterScorer().
 type Scorer interface {

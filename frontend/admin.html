@@ -18,10 +18,12 @@
       <div class="collapse navbar-collapse" id="navMenu">
         <ul class="navbar-nav me-auto">
           <li class="nav-item"><a class="nav-link" data-i18n="nav.challenges" href="/challenges">Challenges</a></li>
+          <li class="nav-item"><a class="nav-link" data-i18n="nav.modules" href="/modules">Modules</a></li>
           <li class="nav-item"><a class="nav-link" data-i18n="nav.scoreboard" href="/scoreboard">Scoreboard</a></li>
         </ul>
         <ul class="navbar-nav ms-auto">
           <li class="nav-item"><a class="nav-link active" data-i18n="nav.admin" href="/admin">Admin</a></li>
+          <li class="nav-item"><a class="nav-link" href="/admin/deploy">Deploy</a></li>
           <li class="nav-item"><a class="nav-link" href="/admin/plugins">Plugins</a></li>
           <li class="nav-item"><a class="nav-link" data-i18n="nav.profile" href="/profile">Profile</a></li>
           <li class="nav-item"><a class="nav-link" data-i18n="nav.logout" href="#" onclick="logout()">Logout</a></li>
@@ -54,7 +56,13 @@
         <a class="nav-link" href="#" onclick="showTab('pages',this)" data-i18n="admin.pages">Pages</a>
       </li>
       <li class="nav-item">
+        <a class="nav-link" href="#" onclick="showTab('modules',this)" data-i18n="admin.modules">Modules</a>
+      </li>
+      <li class="nav-item">
         <a class="nav-link" href="#" onclick="showTab('settings',this)">Settings</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="/admin/deploy">Deploy</a>
       </li>
       <li class="nav-item">
         <a class="nav-link" href="/admin/plugins">Plugins</a>
@@ -69,10 +77,10 @@
       <div class="card p-0">
         <table class="admin-table">
           <thead>
-            <tr><th>ID</th><th>Name</th><th>Category</th><th>Points</th><th>Flag Type</th><th>Deploy</th><th>Visible</th><th>Actions</th></tr>
+            <tr><th>ID</th><th>Name</th><th>Category</th><th>Points</th><th>Type</th><th>Checker</th><th>Deploy</th><th>Visible</th><th>Actions</th></tr>
           </thead>
           <tbody id="challenges-body">
-            <tr><td colspan="8" class="text-center py-3 text-muted">Loading…</td></tr>
+            <tr><td colspan="9" class="text-center py-3 text-muted">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -133,7 +141,7 @@
               <input type="text" class="form-control" id="page-slug" placeholder="e.g. about">
             </div>
             <div class="mb-3">
-              <label class="form-label" data-i18n="pages.content_label">Content (HTML)</label>
+              <label class="form-label" data-i18n="pages.content_label">Content (Markdown)</label>
               <textarea class="form-control" id="page-content" rows="6"></textarea>
             </div>
             <div class="form-check mb-3">
@@ -155,6 +163,47 @@
     </div>
 
     <!-- ═══ Settings Tab ═══ -->
+    <!-- Modules Tab -->
+    <div id="tab-modules" style="display:none">
+      <div class="row g-4">
+        <div class="col-lg-4">
+          <div class="card p-4">
+            <h5 class="mb-3" id="module-form-title">New Module</h5>
+            <input type="hidden" id="module-id">
+            <div class="mb-3">
+              <label class="form-label">Title</label>
+              <input type="text" class="form-control" id="module-title">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Slug</label>
+              <input type="text" class="form-control" id="module-slug" placeholder="web-basics">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Description</label>
+              <textarea class="form-control" id="module-description" rows="3"></textarea>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Sort Order</label>
+              <input type="number" class="form-control" id="module-sort" value="0">
+            </div>
+            <div class="form-check mb-3">
+              <input class="form-check-input" type="checkbox" id="module-draft">
+              <label class="form-check-label" for="module-draft">Draft</label>
+            </div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-primary" onclick="saveModule()">Save Module</button>
+              <button class="btn btn-secondary" onclick="resetModuleForm()">Cancel</button>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-8">
+          <div id="modules-list-container">
+            <div class="text-muted text-center py-4">Loading...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div id="tab-settings" style="display:none">
       <ul class="nav nav-pills flex-wrap gap-2 mb-4" id="settings-tabs">
         <li class="nav-item"><a class="nav-link active" href="#" onclick="showSettingsSubTab('appearance',this)">Appearance</a></li>
@@ -678,10 +727,10 @@
         </div>
         <div class="modal-body">
           <ul class="nav nav-tabs mb-3" id="ch-tabs">
-            <li class="nav-item"><a class="nav-link active" href="#" onclick="showChTab('basic',this)">Basic</a></li>
-            <li class="nav-item"><a class="nav-link" href="#" onclick="showChTab('flags',this)">Flags</a></li>
-            <li class="nav-item"><a class="nav-link" href="#" onclick="showChTab('hints',this)">Hints</a></li>
-            <li class="nav-item"><a class="nav-link" href="#" onclick="showChTab('files',this)">Files</a></li>
+            <li class="nav-item"><a class="nav-link active" id="ch-tab-link-basic" href="#" onclick="showChTab('basic',this)">Basic</a></li>
+            <li class="nav-item"><a class="nav-link" id="ch-tab-link-flags" href="#" onclick="showChTab('flags',this)">Flags</a></li>
+            <li class="nav-item"><a class="nav-link" id="ch-tab-link-hints" href="#" onclick="showChTab('hints',this)">Hints</a></li>
+            <li class="nav-item"><a class="nav-link" id="ch-tab-link-files" href="#" onclick="showChTab('files',this)">Files</a></li>
           </ul>
 
           <form id="ch-form" onsubmit="saveChallengeForm(event)">
@@ -713,6 +762,18 @@
                   <input type="number" class="form-control" id="ch-max-attempts" value="0" min="0">
                 </div>
                 <div class="col-md-4">
+                  <label class="form-label">Challenge Type</label>
+                  <select class="form-select" id="ch-challenge-type">
+                    <option value="static">Static</option>
+                    <option value="dynamic_deploy">Dynamic Deploy</option>
+                    <option value="pentest">Pentest</option>
+                    <option value="attack_defence_attack">Attack &amp; Defence Attack</option>
+                    <option value="attack_defence_defense">Attack &amp; Defence Defense</option>
+                  </select>
+                </div>
+              </div>
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
                   <label class="form-label">Flag Type / Checker</label>
                   <select class="form-select" id="ch-flag-type">
                     <option value="exact">Exact (static)</option>
@@ -721,6 +782,18 @@
                     <option value="prefix">Prefix</option>
                   </select>
                 </div>
+                <div class="col-md-6">
+                  <label class="form-label">Checker Config (JSON)</label>
+                  <textarea class="form-control font-monospace" id="ch-checker-config" rows="2">{}</textarea>
+                </div>
+              </div>
+              <div class="card p-3 mb-3" id="checker-builder-card">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <label class="form-label mb-0">Checker Builder</label>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" onclick="reloadCheckerBuilderFromJson()">Sync Builder From JSON</button>
+                </div>
+                <div id="checker-builder-help" class="text-muted small mb-3"></div>
+                <div id="checker-builder-panel"></div>
               </div>
               <!-- Flag (primary) field removed -->
               <div class="mb-3">
@@ -732,15 +805,15 @@
                   <label class="form-label">Deploy Type</label>
                   <select class="form-select" id="ch-deploy-type">
                     <option value="no_deploy">No Deploy</option>
-                    <option value="single_instance">Single Instance</option>
-                    <option value="per_user">Per User</option>
-                    <option value="attack_defence">Attack &amp; Defence</option>
+                    <option value="per_instance">Per Instance Deploy</option>
+                    <option value="always_on">Always On Service</option>
                   </select>
                 </div>
                 <div class="col-md-4">
-                  <label class="form-label">Deploy Backend</label>
+                  <label class="form-label">Deploy Target / Selector</label>
                   <select class="form-select" id="ch-deploy-backend">
                     <option value="">None</option>
+                    <option value="auto">Auto Scheduler</option>
                     <option value="docker">Docker</option>
                     <option value="kubernetes">Kubernetes</option>
                     <option value="pve">Proxmox VE</option>
@@ -754,6 +827,15 @@
               <div class="mb-3">
                 <label class="form-label">Deploy Config (JSON)</label>
                 <textarea class="form-control" id="ch-deploy-config" rows="2">{}</textarea>
+                <div id="deploy-config-help" class="text-muted small mt-2"></div>
+              </div>
+              <div class="card p-3 mb-3" id="deploy-builder-card">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <label class="form-label mb-0">Deploy Builder</label>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" onclick="reloadDeployBuilderFromJson()">Sync Builder From JSON</button>
+                </div>
+                <div id="deploy-builder-help" class="text-muted small mb-3"></div>
+                <div id="deploy-builder-panel"></div>
               </div>
               <div class="form-check mb-3">
                 <input class="form-check-input" type="checkbox" id="ch-visible" checked>
@@ -826,6 +908,8 @@
   <script>
     let chBsModal = null;
     let _currentChId = null;
+    let challengeTypeSpecs = {};
+    let deployTargets = [];
 
     function escHtml(s) {
       return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -837,22 +921,534 @@
         regex: 'Regex',
         case_insensitive: 'Case-Insensitive',
         prefix: 'Prefix',
+        static: 'Static',
+        dynamic_deploy: 'Dynamic Deploy',
+        pentest: 'Pentest',
+        attack_defence_attack: 'Attack & Defence Attack',
+        attack_defence_defense: 'Attack & Defence Defense',
+        no_deploy: 'No Deploy',
+        per_instance: 'Per Instance Deploy',
+        always_on: 'Always On Service',
+        single_instance: 'Always On Service',
+        per_user: 'Per Instance Deploy',
+        attack_defence: 'Always On Service',
       };
       if (labels[name]) return labels[name];
       return name.replace(/[_-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    }
+
+    function safeParseJson(raw, fallback = {}) {
+      try {
+        const parsed = JSON.parse(raw || '{}');
+        if (parsed && typeof parsed === 'object') return parsed;
+      } catch (_) {}
+      return fallback;
+    }
+
+    function normalizeDeployTypeValue(value, challengeType = '') {
+      const raw = String(value || '').trim().toLowerCase();
+      let normalized = raw;
+      if (!normalized || normalized === 'none') normalized = 'no_deploy';
+      if (normalized === 'single_instance' || normalized === 'attack_defence' || normalized === 'shared' || normalized === 'shared_service') normalized = 'always_on';
+      if (normalized === 'per_user' || normalized === 'per_team' || normalized === 'instance' || normalized === 'per_instance_deploy') normalized = 'per_instance';
+      if (challengeType === 'dynamic_deploy' && normalized === 'no_deploy') normalized = 'per_instance';
+      if ((challengeType === 'pentest' || challengeType === 'attack_defence_attack' || challengeType === 'attack_defence_defense') && normalized === 'no_deploy') normalized = 'always_on';
+      return normalized;
+    }
+
+    function checkerOptionTags(selected) {
+      const options = [...document.querySelectorAll('#ch-flag-type option')].map(option =>
+        `<option value="${escHtml(option.value)}" ${option.value === selected ? 'selected' : ''}>${escHtml(option.textContent)}</option>`
+      );
+      return options.join('');
+    }
+
+    function defaultCheckerConfigForType(type) {
+      if (type === 'pentest') {
+        return {
+          flags: [
+            { key: 'user', label: 'User', value: '', type: 'exact', points: 100 },
+            { key: 'root', label: 'Root', value: '', type: 'exact', points: 250 },
+          ]
+        };
+      }
+      if (type === 'attack_defence_attack') {
+        return {
+          attack_buckets: [
+            { key: 'rce', label: 'RCE', points: 200 },
+            { key: 'sqli', label: 'SQLi', points: 100 },
+          ]
+        };
+      }
+      if (type === 'attack_defence_defense') {
+        return {
+          defense_checks: [
+            { key: 'http', script: './check-http.sh', points: 50 },
+            { key: 'auth', script: './check-auth.sh', points: 50 },
+          ]
+        };
+      }
+      return {};
+    }
+
+    function defaultDeployConfigForType(type) {
+      if (type === 'dynamic_deploy') {
+        return {
+          cpus: '1.0',
+          memory: '512m',
+          ports: { '8080': '' }
+        };
+      }
+      if (type === 'pentest') {
+        return {
+          cpus: '1.0',
+          memory: '512m',
+          ports: { '8080': '' }
+        };
+      }
+      if (type === 'attack_defence_attack' || type === 'attack_defence_defense') {
+        return {
+          cpus: '1.0',
+          memory: '512m',
+          ports: {}
+        };
+      }
+      return {};
+    }
+
+    function deployConfigEnvRows(env) {
+      const entries = Object.entries(env || {});
+      if (!entries.length) entries.push(['', '']);
+      return entries.map(([key, value], index) => `
+        <tr>
+          <td><input class="form-control form-control-sm" data-deploy-env-key data-index="${index}" value="${escHtml(key || '')}" oninput="syncDeployConfigFromBuilder()"></td>
+          <td><input class="form-control form-control-sm" data-deploy-env-value data-index="${index}" value="${escHtml(value || '')}" oninput="syncDeployConfigFromBuilder()"></td>
+          <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeDeployBuilderRow('env', ${index})">Remove</button></td>
+        </tr>
+      `).join('');
+    }
+
+    function deployConfigPortRows(ports) {
+      const entries = Object.entries(ports || {});
+      if (!entries.length) entries.push(['', '']);
+      return entries.map(([container, host], index) => `
+        <tr>
+          <td><input class="form-control form-control-sm" data-deploy-port-container data-index="${index}" value="${escHtml(container || '')}" placeholder="8080" oninput="syncDeployConfigFromBuilder()"></td>
+          <td><input class="form-control form-control-sm" data-deploy-port-host data-index="${index}" value="${escHtml(host || '')}" placeholder="18080 or empty" oninput="syncDeployConfigFromBuilder()"></td>
+          <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeDeployBuilderRow('ports', ${index})">Remove</button></td>
+        </tr>
+      `).join('');
+    }
+
+    function reloadDeployBuilderFromJson() {
+      renderDeployBuilder();
+    }
+
+    function renderDeployBuilder() {
+      const type = document.getElementById('ch-challenge-type').value || 'static';
+      const deployType = normalizeDeployTypeValue(document.getElementById('ch-deploy-type').value || 'no_deploy', type);
+      const selector = document.getElementById('ch-deploy-backend').value || '';
+      const raw = document.getElementById('ch-deploy-config').value || '{}';
+      const cfg = safeParseJson(raw, defaultDeployConfigForType(type));
+      const card = document.getElementById('deploy-builder-card');
+      const panel = document.getElementById('deploy-builder-panel');
+      const help = document.getElementById('deploy-builder-help');
+
+      if (deployType === 'no_deploy') {
+        card.style.display = '';
+        help.textContent = 'Deploy is disabled for this challenge. Builder is kept visible so you can preconfigure runtime values before switching deploy mode.';
+      } else {
+        card.style.display = '';
+        help.textContent = `Deploy mode: ${pluginLabel(deployType)}. Target selector: ${selector || 'none'}. Configure common runtime fields here; unsupported fields are ignored by the selected backend.`;
+      }
+
+      const env = cfg.env && typeof cfg.env === 'object' ? cfg.env : {};
+      const ports = cfg.ports && typeof cfg.ports === 'object' ? cfg.ports : {};
+      panel.innerHTML = `
+        <div class="row g-3 mb-3">
+          <div class="col-md-3">
+            <label class="form-label">CPUs</label>
+            <input class="form-control form-control-sm" id="deploy-builder-cpus" value="${escHtml(cfg.cpus || '')}" placeholder="1.0" oninput="syncDeployConfigFromBuilder()">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Memory</label>
+            <input class="form-control form-control-sm" id="deploy-builder-memory" value="${escHtml(cfg.memory || '')}" placeholder="512m" oninput="syncDeployConfigFromBuilder()">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Workdir</label>
+            <input class="form-control form-control-sm" id="deploy-builder-workdir" value="${escHtml(cfg.workdir || '')}" placeholder="/app" oninput="syncDeployConfigFromBuilder()">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Restart</label>
+            <input class="form-control form-control-sm" id="deploy-builder-restart" value="${escHtml(cfg.restart || '')}" placeholder="unless-stopped" oninput="syncDeployConfigFromBuilder()">
+          </div>
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-md-4">
+            <label class="form-label">Local Build Context</label>
+            <input class="form-control form-control-sm" id="deploy-builder-build-context" value="${escHtml(cfg.build_context || '')}" placeholder="web/task-01" oninput="syncDeployConfigFromBuilder()">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Dockerfile</label>
+            <input class="form-control form-control-sm" id="deploy-builder-dockerfile" value="${escHtml(cfg.dockerfile || '')}" placeholder="Dockerfile" oninput="syncDeployConfigFromBuilder()">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">K8s Service Type</label>
+            <select class="form-select form-select-sm" id="deploy-builder-service-type" onchange="syncDeployConfigFromBuilder()">
+              <option value="" ${!cfg.service_type ? 'selected' : ''}>Default</option>
+              <option value="ClusterIP" ${cfg.service_type === 'ClusterIP' ? 'selected' : ''}>ClusterIP</option>
+              <option value="NodePort" ${cfg.service_type === 'NodePort' ? 'selected' : ''}>NodePort</option>
+            </select>
+          </div>
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-md-12">
+            <label class="form-label">K8s Image Pull Secret</label>
+            <input class="form-control form-control-sm" id="deploy-builder-image-pull-secret" value="${escHtml(cfg.image_pull_secret || '')}" placeholder="registry-credentials" oninput="syncDeployConfigFromBuilder()">
+            <div class="text-muted small mt-1">Optional Kubernetes secret name for private registries. The secret must already exist in the target namespace.</div>
+          </div>
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-md-12">
+            <label class="form-label">Command</label>
+            <input class="form-control form-control-sm" id="deploy-builder-command" value="${escHtml(Array.isArray(cfg.command) ? cfg.command.join(' ') : '')}" placeholder="./service --port 8080" oninput="syncDeployConfigFromBuilder()">
+            <div class="text-muted small mt-1">Split by spaces for now. Quote-aware parsing is intentionally not done in the UI.</div>
+          </div>
+        </div>
+        <div class="row g-3">
+          <div class="col-lg-6">
+            <div class="border rounded p-3 h-100">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <label class="form-label mb-0">Environment</label>
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="addDeployBuilderRow('env')">Add Env</button>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead><tr><th>Key</th><th>Value</th><th></th></tr></thead>
+                  <tbody>${deployConfigEnvRows(env)}</tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="col-lg-6">
+            <div class="border rounded p-3 h-100">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <label class="form-label mb-0">Ports</label>
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="addDeployBuilderRow('ports')">Add Port</button>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead><tr><th>Container</th><th>Host / NodePort</th><th></th></tr></thead>
+                  <tbody>${deployConfigPortRows(ports)}</tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function splitCommandParts(raw) {
+      return String(raw || '').trim().split(/\s+/).filter(Boolean);
+    }
+
+    function syncDeployConfigFromBuilder() {
+      const payload = {};
+
+      const cpus = document.getElementById('deploy-builder-cpus')?.value.trim();
+      const memory = document.getElementById('deploy-builder-memory')?.value.trim();
+      const workdir = document.getElementById('deploy-builder-workdir')?.value.trim();
+      const restart = document.getElementById('deploy-builder-restart')?.value.trim();
+      const buildContext = document.getElementById('deploy-builder-build-context')?.value.trim();
+      const dockerfile = document.getElementById('deploy-builder-dockerfile')?.value.trim();
+      const serviceType = document.getElementById('deploy-builder-service-type')?.value;
+      const imagePullSecret = document.getElementById('deploy-builder-image-pull-secret')?.value.trim();
+      const command = splitCommandParts(document.getElementById('deploy-builder-command')?.value);
+
+      if (cpus) payload.cpus = cpus;
+      if (memory) payload.memory = memory;
+      if (workdir) payload.workdir = workdir;
+      if (restart) payload.restart = restart;
+      if (buildContext) payload.build_context = buildContext;
+      if (dockerfile) payload.dockerfile = dockerfile;
+      if (serviceType) payload.service_type = serviceType;
+      if (imagePullSecret) payload.image_pull_secret = imagePullSecret;
+      if (command.length) payload.command = command;
+
+      const env = {};
+      document.querySelectorAll('[data-deploy-env-key]').forEach((input, index) => {
+        const key = input.value.trim();
+        const value = document.querySelector(`[data-deploy-env-value][data-index="${index}"]`)?.value ?? '';
+        if (key) env[key] = value;
+      });
+      if (Object.keys(env).length) payload.env = env;
+
+      const ports = {};
+      document.querySelectorAll('[data-deploy-port-container]').forEach((input, index) => {
+        const container = input.value.trim();
+        const host = document.querySelector(`[data-deploy-port-host][data-index="${index}"]`)?.value?.trim() ?? '';
+        if (container) ports[container] = host;
+      });
+      if (Object.keys(ports).length) payload.ports = ports;
+
+      document.getElementById('ch-deploy-config').value = JSON.stringify(payload, null, 2);
+    }
+
+    function addDeployBuilderRow(kind) {
+      const cfg = safeParseJson(document.getElementById('ch-deploy-config').value || '{}', {});
+      if (kind === 'env') {
+        const next = cfg.env && typeof cfg.env === 'object' ? { ...cfg.env } : {};
+        next[''] = '';
+        cfg.env = next;
+      } else if (kind === 'ports') {
+        const next = cfg.ports && typeof cfg.ports === 'object' ? { ...cfg.ports } : {};
+        next[''] = '';
+        cfg.ports = next;
+      }
+      document.getElementById('ch-deploy-config').value = JSON.stringify(cfg, null, 2);
+      renderDeployBuilder();
+    }
+
+    function removeDeployBuilderRow(kind, index) {
+      const cfg = safeParseJson(document.getElementById('ch-deploy-config').value || '{}', {});
+      if (kind === 'env') {
+        const entries = Object.entries(cfg.env || {});
+        entries.splice(index, 1);
+        cfg.env = Object.fromEntries(entries);
+      } else if (kind === 'ports') {
+        const entries = Object.entries(cfg.ports || {});
+        entries.splice(index, 1);
+        cfg.ports = Object.fromEntries(entries);
+      }
+      document.getElementById('ch-deploy-config').value = JSON.stringify(cfg, null, 2);
+      renderDeployBuilder();
+    }
+
+    function reloadCheckerBuilderFromJson() {
+      renderCheckerBuilder();
+    }
+
+    function renderCheckerBuilder() {
+      const type = document.getElementById('ch-challenge-type').value || 'static';
+      const raw = document.getElementById('ch-checker-config').value || '{}';
+      const cfg = safeParseJson(raw, defaultCheckerConfigForType(type));
+      const card = document.getElementById('checker-builder-card');
+      const panel = document.getElementById('checker-builder-panel');
+      const help = document.getElementById('checker-builder-help');
+
+      if (type === 'dynamic_deploy') {
+        card.style.display = '';
+        help.textContent = 'Dynamic deploy uses the per-instance flag from runtime context. Checker config is not used for player flag verification.';
+        panel.innerHTML = '<div class="text-muted small">No checker fields are required for this challenge type.</div>';
+        return;
+      }
+
+      if (type === 'static') {
+        card.style.display = '';
+        help.textContent = 'Static challenges usually use manual flags. Raw JSON remains available for advanced plugin-specific checker settings.';
+        panel.innerHTML = '<div class="text-muted small">No structured builder is required here. Use manual flags and, if needed, the raw JSON field above.</div>';
+        return;
+      }
+
+      if (type === 'pentest') {
+        const flags = Array.isArray(cfg.flags) && cfg.flags.length ? cfg.flags : defaultCheckerConfigForType(type).flags;
+        card.style.display = '';
+        help.textContent = 'Define user/root/additional pentest flags and weighted points. Builder output is written back into the raw JSON field.';
+        panel.innerHTML = `
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead><tr><th>Key</th><th>Label</th><th>Flag</th><th>Checker</th><th>Points</th><th></th></tr></thead>
+              <tbody>
+                ${flags.map((flag, index) => `
+                  <tr>
+                    <td><input class="form-control form-control-sm" data-pentest-field="key" data-index="${index}" value="${escHtml(flag.key || '')}" oninput="syncCheckerConfigFromBuilder()"></td>
+                    <td><input class="form-control form-control-sm" data-pentest-field="label" data-index="${index}" value="${escHtml(flag.label || '')}" oninput="syncCheckerConfigFromBuilder()"></td>
+                    <td><input class="form-control form-control-sm font-monospace" data-pentest-field="value" data-index="${index}" value="${escHtml(flag.value || '')}" oninput="syncCheckerConfigFromBuilder()"></td>
+                    <td><select class="form-select form-select-sm" data-pentest-field="type" data-index="${index}" onchange="syncCheckerConfigFromBuilder()">${checkerOptionTags(flag.type || 'exact')}</select></td>
+                    <td><input class="form-control form-control-sm" type="number" data-pentest-field="points" data-index="${index}" value="${Number(flag.points || 0)}" oninput="syncCheckerConfigFromBuilder()"></td>
+                    <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeCheckerBuilderRow('pentest', ${index})">Remove</button></td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-primary" onclick="addCheckerBuilderRow('pentest')">Add Pentest Flag</button>
+        `;
+        return;
+      }
+
+      if (type === 'attack_defence_attack') {
+        const buckets = Array.isArray(cfg.attack_buckets) && cfg.attack_buckets.length ? cfg.attack_buckets : (Array.isArray(cfg.buckets) && cfg.buckets.length ? cfg.buckets : defaultCheckerConfigForType(type).attack_buckets);
+        card.style.display = '';
+        help.textContent = 'Define weighted vulnerability buckets. Exploits uploaded to the AD runner must point to one of these bucket keys.';
+        panel.innerHTML = `
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead><tr><th>Key</th><th>Label</th><th>Points</th><th></th></tr></thead>
+              <tbody>
+                ${buckets.map((bucket, index) => `
+                  <tr>
+                    <td><input class="form-control form-control-sm" data-attack-field="key" data-index="${index}" value="${escHtml(bucket.key || '')}" oninput="syncCheckerConfigFromBuilder()"></td>
+                    <td><input class="form-control form-control-sm" data-attack-field="label" data-index="${index}" value="${escHtml(bucket.label || '')}" oninput="syncCheckerConfigFromBuilder()"></td>
+                    <td><input class="form-control form-control-sm" type="number" data-attack-field="points" data-index="${index}" value="${Number(bucket.points || 0)}" oninput="syncCheckerConfigFromBuilder()"></td>
+                    <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeCheckerBuilderRow('attack', ${index})">Remove</button></td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-primary" onclick="addCheckerBuilderRow('attack')">Add Bucket</button>
+        `;
+        return;
+      }
+
+      if (type === 'attack_defence_defense') {
+        const checks = Array.isArray(cfg.defense_checks) && cfg.defense_checks.length ? cfg.defense_checks : defaultCheckerConfigForType(type).defense_checks;
+        card.style.display = '';
+        help.textContent = 'Define weighted defense checks. The AD engine sums the surviving checks to compute `up`, `corrupt`, or `down`.';
+        panel.innerHTML = `
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead><tr><th>Key</th><th>Checker Script</th><th>Points</th><th></th></tr></thead>
+              <tbody>
+                ${checks.map((check, index) => `
+                  <tr>
+                    <td><input class="form-control form-control-sm" data-defense-field="key" data-index="${index}" value="${escHtml(check.key || '')}" oninput="syncCheckerConfigFromBuilder()"></td>
+                    <td><input class="form-control form-control-sm font-monospace" data-defense-field="script" data-index="${index}" value="${escHtml(check.script || '')}" oninput="syncCheckerConfigFromBuilder()"></td>
+                    <td><input class="form-control form-control-sm" type="number" data-defense-field="points" data-index="${index}" value="${Number(check.points || 0)}" oninput="syncCheckerConfigFromBuilder()"></td>
+                    <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeCheckerBuilderRow('defense', ${index})">Remove</button></td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-primary" onclick="addCheckerBuilderRow('defense')">Add Defense Check</button>
+        `;
+        return;
+      }
+
+      card.style.display = '';
+      help.textContent = 'This challenge type does not expose a built-in structured builder. Use the raw JSON field for plugin-defined config.';
+      panel.innerHTML = '<div class="text-muted small">Raw JSON only.</div>';
+    }
+
+    function syncCheckerConfigFromBuilder() {
+      const type = document.getElementById('ch-challenge-type').value || 'static';
+      let payload = {};
+
+      if (type === 'pentest') {
+        payload.flags = [...document.querySelectorAll('[data-pentest-field="key"]')].map((input, index) => ({
+          key: input.value.trim(),
+          label: document.querySelector(`[data-pentest-field="label"][data-index="${index}"]`).value.trim(),
+          value: document.querySelector(`[data-pentest-field="value"][data-index="${index}"]`).value,
+          type: document.querySelector(`[data-pentest-field="type"][data-index="${index}"]`).value,
+          points: parseInt(document.querySelector(`[data-pentest-field="points"][data-index="${index}"]`).value || '0', 10) || 0,
+        })).filter(flag => flag.key || flag.value || flag.label);
+      } else if (type === 'attack_defence_attack') {
+        payload.attack_buckets = [...document.querySelectorAll('[data-attack-field="key"]')].map((input, index) => ({
+          key: input.value.trim(),
+          label: document.querySelector(`[data-attack-field="label"][data-index="${index}"]`).value.trim(),
+          points: parseInt(document.querySelector(`[data-attack-field="points"][data-index="${index}"]`).value || '0', 10) || 0,
+        })).filter(bucket => bucket.key || bucket.label);
+      } else if (type === 'attack_defence_defense') {
+        payload.defense_checks = [...document.querySelectorAll('[data-defense-field="key"]')].map((input, index) => ({
+          key: input.value.trim(),
+          script: document.querySelector(`[data-defense-field="script"][data-index="${index}"]`).value.trim(),
+          points: parseInt(document.querySelector(`[data-defense-field="points"][data-index="${index}"]`).value || '0', 10) || 0,
+        })).filter(check => check.key || check.script);
+      } else {
+        return;
+      }
+
+      document.getElementById('ch-checker-config').value = JSON.stringify(payload, null, 2);
+    }
+
+    function addCheckerBuilderRow(kind) {
+      const type = document.getElementById('ch-challenge-type').value || 'static';
+      const cfg = safeParseJson(document.getElementById('ch-checker-config').value || '{}', defaultCheckerConfigForType(type));
+      if (kind === 'pentest') {
+        const list = Array.isArray(cfg.flags) ? cfg.flags : [];
+        list.push({ key: '', label: '', value: '', type: 'exact', points: 0 });
+        cfg.flags = list;
+      } else if (kind === 'attack') {
+        const list = Array.isArray(cfg.attack_buckets) ? cfg.attack_buckets : (Array.isArray(cfg.buckets) ? cfg.buckets : []);
+        list.push({ key: '', label: '', points: 0 });
+        cfg.attack_buckets = list;
+        delete cfg.buckets;
+      } else if (kind === 'defense') {
+        const list = Array.isArray(cfg.defense_checks) ? cfg.defense_checks : [];
+        list.push({ key: '', script: '', points: 0 });
+        cfg.defense_checks = list;
+      }
+      document.getElementById('ch-checker-config').value = JSON.stringify(cfg, null, 2);
+      renderCheckerBuilder();
+    }
+
+    function removeCheckerBuilderRow(kind, index) {
+      const type = document.getElementById('ch-challenge-type').value || 'static';
+      const cfg = safeParseJson(document.getElementById('ch-checker-config').value || '{}', defaultCheckerConfigForType(type));
+      if (kind === 'pentest' && Array.isArray(cfg.flags)) cfg.flags.splice(index, 1);
+      if (kind === 'attack') {
+        if (Array.isArray(cfg.attack_buckets)) cfg.attack_buckets.splice(index, 1);
+        else if (Array.isArray(cfg.buckets)) cfg.buckets.splice(index, 1);
+      }
+      if (kind === 'defense' && Array.isArray(cfg.defense_checks)) cfg.defense_checks.splice(index, 1);
+      document.getElementById('ch-checker-config').value = JSON.stringify(cfg, null, 2);
+      renderCheckerBuilder();
     }
 
     async function loadPluginOptions() {
       try {
         const plugins = await apiFetch('/api/plugins');
         const flagCheckers = Array.isArray(plugins.flag_checkers) ? plugins.flag_checkers : [];
+        const challengeTypes = Array.isArray(plugins.challenge_types) ? plugins.challenge_types : [];
+        const challengeTypeSpecsList = Array.isArray(plugins.challenge_type_specs) ? plugins.challenge_type_specs : [];
         const flagSelect = document.getElementById('ch-flag-type');
         const newFlagSelect = document.getElementById('new-flag-type');
+        const typeSelect = document.getElementById('ch-challenge-type');
+        challengeTypeSpecs = Object.fromEntries(challengeTypeSpecsList.map(spec => [spec.id, spec]));
         const options = flagCheckers.map(name => `<option value="${escHtml(name)}">${escHtml(pluginLabel(name))}</option>`).join('');
+        const typeSource = challengeTypeSpecsList.length ? challengeTypeSpecsList.map(spec => spec.id) : challengeTypes;
+        const typeOptions = typeSource.map(name => {
+          const spec = challengeTypeSpecs[name];
+          const label = spec && spec.title ? spec.title : pluginLabel(name);
+          return `<option value="${escHtml(name)}">${escHtml(label)}</option>`;
+        }).join('');
         if (flagSelect) flagSelect.innerHTML = options || flagSelect.innerHTML;
         if (newFlagSelect) newFlagSelect.innerHTML = options || newFlagSelect.innerHTML;
+        if (typeSelect) typeSelect.innerHTML = typeOptions || typeSelect.innerHTML;
       } catch (_) {
         // Keep the built-in fallback options when the registry endpoint is unavailable.
+      }
+    }
+
+    async function loadDeployTargetOptions() {
+      const select = document.getElementById('ch-deploy-backend');
+      if (!select) return;
+      const current = select.value;
+      let targets = [];
+      try {
+        const payload = await apiFetch('/api/admin/deploy');
+        targets = Array.isArray(payload.targets) ? payload.targets : [];
+      } catch (_) {
+        targets = [];
+      }
+      deployTargets = targets;
+      const dynamicOptions = targets
+        .filter(target => target && target.id)
+        .sort((a, b) => (a.order || 0) - (b.order || 0) || String(a.id).localeCompare(String(b.id)))
+        .map(target => `<option value="${escHtml(target.id)}">${escHtml(`${target.id} (${target.type})`)}</option>`)
+        .join('');
+      select.innerHTML = `
+        <option value="">None</option>
+        <option value="auto">Auto Scheduler</option>
+        <option value="docker">Any Docker Target</option>
+        <option value="kubernetes">Any Kubernetes Target</option>
+        <option value="pve">Any Proxmox VE Target</option>
+        ${dynamicOptions}
+      `;
+      if ([...select.options].some(option => option.value === current)) {
+        select.value = current;
       }
     }
 
@@ -863,14 +1459,18 @@
 
     // ── Tab management ──
     function showTab(name, el) {
+      const target = document.getElementById('tab-' + name);
+      if (!target) return;
       document.querySelectorAll('[id^="tab-"]').forEach(t => t.style.display = 'none');
       document.querySelectorAll('.nav-tabs:not(#ch-tabs) .nav-link').forEach(l => l.classList.remove('active'));
-      document.getElementById('tab-' + name).style.display = '';
-      el.classList.add('active');
+      target.style.display = '';
+      const link = el || document.querySelector(`.nav-tabs:not(#ch-tabs) .nav-link[onclick*="'${name}'"]`);
+      if (link) link.classList.add('active');
       if (name === 'challenges')    loadAdminChallenges();
       else if (name === 'users')    loadAdminUsers();
       else if (name === 'notifications') loadAdminNotifications();
       else if (name === 'pages')    loadAdminPages();
+      else if (name === 'modules')  loadAdminModules();
       else if (name === 'settings') {
         loadAdminConfig();
         const first = document.querySelector('#settings-tabs .nav-link');
@@ -897,6 +1497,93 @@
       if (name === 'files' && _currentChId) loadAdminFiles(_currentChId);
     }
 
+    function getCurrentChallengeTypeSpec() {
+      const type = document.getElementById('ch-challenge-type').value || 'static';
+      return challengeTypeSpecs[type] || null;
+    }
+
+    function syncChallengeTypeUI(applyDefaults = false) {
+      const spec = getCurrentChallengeTypeSpec();
+      const type = document.getElementById('ch-challenge-type').value || 'static';
+      const flagsLink = document.getElementById('ch-tab-link-flags');
+      const flagsNote = document.getElementById('flags-note');
+      const checkerConfig = document.getElementById('ch-checker-config');
+      const deployType = document.getElementById('ch-deploy-type');
+      const connectionInfo = document.getElementById('ch-connection-info');
+      const deployConfig = document.getElementById('ch-deploy-config');
+      const deployConfigHelp = document.getElementById('deploy-config-help');
+
+      if (!spec) {
+        if (flagsLink) flagsLink.parentElement.style.display = '';
+        if (checkerConfig) checkerConfig.disabled = false;
+        renderCheckerBuilder();
+        renderDeployBuilder();
+        return;
+      }
+
+      if (flagsLink) {
+        flagsLink.parentElement.style.display = spec.supports_manual_flags === false ? 'none' : '';
+        if (spec.supports_manual_flags === false && document.getElementById('chtab-flags').style.display !== 'none') {
+          showChTab('basic', document.getElementById('ch-tab-link-basic'));
+        }
+      }
+
+      if (checkerConfig) checkerConfig.disabled = spec.supports_checker_config === false;
+
+      if (flagsNote) {
+        if (spec.supports_manual_flags === false) {
+          flagsNote.textContent = type === 'dynamic_deploy'
+            ? 'Dynamic deploy challenges inject the flag into the spawned instance. Manual flag entries are disabled for this type.'
+            : 'This challenge type is scored by runtime services. Manual player flag entries are disabled here.';
+        } else if (type === 'pentest') {
+          flagsNote.textContent = 'Use checker config and additional flags to model user, root, and extra pentest submissions.';
+        } else {
+          flagsNote.textContent = 'Flags can be managed after the challenge is saved.';
+        }
+      }
+
+      if (applyDefaults && spec.default_deploy_type) {
+        deployType.value = normalizeDeployTypeValue(spec.default_deploy_type, type);
+      }
+      if (applyDefaults && spec.requires_deploy && !document.getElementById('ch-deploy-backend').value) {
+        document.getElementById('ch-deploy-backend').value = 'auto';
+      }
+      if (applyDefaults && deployConfig) {
+        const currentConfig = (deployConfig.value || '').trim();
+        const template = defaultDeployConfigForType(type);
+        if ((currentConfig === '' || currentConfig === '{}' || currentConfig === 'null') && Object.keys(template).length) {
+          deployConfig.value = JSON.stringify(template, null, 2);
+        }
+      }
+      if (deployConfigHelp) {
+        if (type === 'dynamic_deploy') {
+          deployConfigHelp.textContent = 'Per-instance runtime. Use container ports only; host ports should usually stay empty so the backend can assign them automatically.';
+        } else if (type === 'pentest') {
+          deployConfigHelp.textContent = 'Always-on pentest service. Use internal service ports and VPN-facing connection info; players should not start this manually.';
+        } else if (type === 'attack_defence_attack') {
+          deployConfigHelp.textContent = 'Always-on service to be attacked. Keep host ports empty unless the selected backend requires explicit exposure. Weighted exploit buckets are defined above.';
+        } else if (type === 'attack_defence_defense') {
+          deployConfigHelp.textContent = 'Defense-oriented service contract. Runtime checker scripts and weighted scoring are defined above.';
+        } else {
+          deployConfigHelp.textContent = 'Advanced deploy config JSON. Use `build_context` for local Docker builds or `image` for external images.';
+        }
+      }
+
+      if (connectionInfo) {
+        if (spec.access_mode === 'vpn') {
+          connectionInfo.placeholder = 'VPN endpoint, jump host, service notes';
+        } else if (spec.access_mode === 'instance') {
+          connectionInfo.placeholder = 'Connection info is usually generated automatically';
+        } else if (spec.access_mode === 'exploit_runner') {
+          connectionInfo.placeholder = 'Attack scheduler, exploit runner, or farm notes';
+        } else {
+          connectionInfo.placeholder = 'nc host 1234';
+        }
+      }
+      renderCheckerBuilder();
+      renderDeployBuilder();
+    }
+
     // ══════════════════════════════════════
     // CHALLENGES
     // ══════════════════════════════════════
@@ -908,8 +1595,9 @@
           <td>${escHtml(c.name)}</td>
           <td>${escHtml(c.category)}</td>
           <td>${c.points}</td>
+          <td><span class="tag">${escHtml(c.challenge_type || 'static')}</span></td>
           <td><span class="tag">${escHtml(c.flag_type || 'exact')}</span></td>
-          <td><span class="tag">${escHtml(c.deploy_type)}</span></td>
+          <td><span class="tag">${escHtml(pluginLabel(normalizeDeployTypeValue(c.deploy_type, c.challenge_type)))}</span></td>
           <td>${c.is_visible ? '<span class="badge bg-success">Yes</span>' : '<span class="badge bg-secondary">No</span>'}</td>
           <td>
             <button class="btn btn-sm btn-secondary me-1" onclick='editChallenge(${JSON.stringify(c)})'>${t('admin.edit')}</button>
@@ -923,6 +1611,8 @@
       document.getElementById('ch-modal-title').textContent = 'New Challenge';
       document.getElementById('ch-form').reset();
       document.getElementById('ch-id').value = '';
+      document.getElementById('ch-challenge-type').value = 'static';
+      document.getElementById('ch-checker-config').value = '{}';
       document.getElementById('ch-deploy-config').value = '{}';
       document.getElementById('ch-visible').checked = true;
       document.getElementById('ch-error').classList.add('d-none');
@@ -932,6 +1622,7 @@
       document.getElementById('flags-list').innerHTML = '';
       document.getElementById('hints-list').innerHTML = '';
       document.getElementById('files-list').innerHTML = '';
+      syncChallengeTypeUI(true);
       showChTab('basic', document.querySelector('#ch-tabs .nav-link'));
       if (!chBsModal) chBsModal = new bootstrap.Modal(document.getElementById('ch-modal'));
       chBsModal.show();
@@ -945,10 +1636,12 @@
       document.getElementById('ch-category').value     = c.category;
       document.getElementById('ch-description').value  = c.description;
       document.getElementById('ch-points').value       = c.points;
+      document.getElementById('ch-challenge-type').value = c.challenge_type || 'static';
       document.getElementById('ch-flag-type').value    = (c.flag_type === 'static') ? 'exact' : (c.flag_type || 'exact');
+      document.getElementById('ch-checker-config').value = c.checker_config || '{}';
       document.getElementById('ch-max-attempts').value = c.max_attempts || 0;
       document.getElementById('ch-connection-info').value = c.connection_info || '';
-      document.getElementById('ch-deploy-type').value  = c.deploy_type;
+      document.getElementById('ch-deploy-type').value  = normalizeDeployTypeValue(c.deploy_type, c.challenge_type);
       document.getElementById('ch-deploy-backend').value = c.deploy_backend || '';
       document.getElementById('ch-image').value        = c.image || '';
       document.getElementById('ch-deploy-config').value = c.deploy_config || '{}';
@@ -958,6 +1651,7 @@
       document.getElementById('flags-note').style.display = 'none';
       document.getElementById('hints-note').style.display = 'none';
       document.getElementById('files-note').style.display = 'none';
+      syncChallengeTypeUI(false);
       showChTab('basic', document.querySelector('#ch-tabs .nav-link'));
       if (!chBsModal) chBsModal = new bootstrap.Modal(document.getElementById('ch-modal'));
       chBsModal.show();
@@ -971,10 +1665,12 @@
         category:        document.getElementById('ch-category').value,
         description:     document.getElementById('ch-description').value,
         points:          parseInt(document.getElementById('ch-points').value),
+        challenge_type:  document.getElementById('ch-challenge-type').value,
         flag_type:       document.getElementById('ch-flag-type').value,
+        checker_config:  document.getElementById('ch-checker-config').value,
         max_attempts:    parseInt(document.getElementById('ch-max-attempts').value) || 0,
         connection_info: document.getElementById('ch-connection-info').value,
-        deploy_type:     document.getElementById('ch-deploy-type').value,
+        deploy_type:     normalizeDeployTypeValue(document.getElementById('ch-deploy-type').value, document.getElementById('ch-challenge-type').value),
         deploy_backend:  document.getElementById('ch-deploy-backend').value,
         image:           document.getElementById('ch-image').value,
         deploy_config:   document.getElementById('ch-deploy-config').value,
@@ -1028,6 +1724,11 @@
     }
 
     async function addFlag() {
+      const spec = getCurrentChallengeTypeSpec();
+      if (spec && spec.supports_manual_flags === false) {
+        alert('Manual flags are disabled for this challenge type.');
+        return;
+      }
       if (!_currentChId) { alert('Save the challenge first.'); return; }
       const content = document.getElementById('new-flag-content').value.trim();
       const type    = document.getElementById('new-flag-type').value;
@@ -1300,6 +2001,200 @@
     // ══════════════════════════════════════
     // CONFIG
     // ══════════════════════════════════════
+    // MODULES
+    let adminModulesCache = [];
+    let adminChallengesCache = [];
+
+    async function loadAdminModules() {
+      const container = document.getElementById('modules-list-container');
+      try {
+        const [modules, challenges] = await Promise.all([
+          apiFetch('/api/admin/modules'),
+          apiFetch('/api/admin/challenges'),
+        ]);
+        adminModulesCache = modules || [];
+        adminChallengesCache = challenges || [];
+        if (!adminModulesCache.length) {
+          container.innerHTML = '<p class="text-muted text-center py-4">No modules yet.</p>';
+          return;
+        }
+        container.innerHTML = adminModulesCache.map(renderAdminModule).join('');
+      } catch (err) {
+        container.innerHTML = `<div class="alert alert-danger">${escHtml(err.message)}</div>`;
+      }
+    }
+
+    function showInitialAdminTab() {
+      const requested = String(location.hash || '').replace(/^#/, '');
+      const validTabs = ['challenges', 'users', 'notifications', 'pages', 'modules', 'settings'];
+      if (validTabs.includes(requested)) {
+        showTab(requested);
+        return;
+      }
+      showTab('challenges');
+    }
+
+    function renderAdminModule(m) {
+      const items = m.items || [];
+      return `
+        <div class="card p-3 mb-3">
+          <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+            <div>
+              <h5 class="mb-1">${escHtml(m.title)}</h5>
+              <div class="text-muted small">/${escHtml(m.slug)} - order ${parseInt(m.sort_order) || 0}</div>
+              ${m.description ? `<div class="small mt-2">${escHtml(m.description)}</div>` : ''}
+              ${m.draft ? '<span class="badge bg-warning text-dark mt-2">Draft</span>' : ''}
+            </div>
+            <div class="d-flex gap-1">
+              <button class="btn btn-sm btn-secondary" onclick="editModuleById(${m.id})">Edit</button>
+              <button class="btn btn-sm btn-danger" onclick="deleteModule(${m.id})">Delete</button>
+            </div>
+          </div>
+          <div class="mt-3">
+            ${items.length ? items.map(renderAdminModuleItem).join('') : '<p class="text-muted small mb-2">No items yet.</p>'}
+            <div class="row g-2 align-items-end mt-2">
+              <div class="col-md-2">
+                <label class="form-label">Type</label>
+                <select class="form-select form-select-sm" id="module-item-type-${m.id}" onchange="syncModuleItemTarget(${m.id})">
+                  <option value="theory">Theory</option>
+                  <option value="challenge">Challenge</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Challenge Target</label>
+                <select class="form-select form-select-sm" id="module-item-target-${m.id}" disabled>
+                  ${renderModuleTargetOptions('challenge')}
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label">Title override</label>
+                <input class="form-control form-control-sm" id="module-item-title-${m.id}" placeholder="optional">
+              </div>
+              <div class="col-md-2">
+                <label class="form-label">Order</label>
+                <input type="number" class="form-control form-control-sm" id="module-item-sort-${m.id}" value="${items.length + 1}">
+              </div>
+              <div class="col-md-1 d-grid">
+                <button class="btn btn-sm btn-primary" onclick="addModuleItem(${m.id})">Add</button>
+              </div>
+            </div>
+            <div class="mt-2" id="module-item-content-wrap-${m.id}">
+              <label class="form-label">Theory Markdown</label>
+              <textarea class="form-control form-control-sm font-monospace" id="module-item-content-${m.id}" rows="5" placeholder="Write the lesson step here. You can insert challenge steps before or after it by order."></textarea>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    function renderAdminModuleItem(item) {
+      const target = item.type === 'theory'
+        ? (item.content ? item.content.slice(0, 96) + (item.content.length > 96 ? '...' : '') : (item.page ? item.page.title : 'Empty theory step'))
+        : (item.challenge ? item.challenge.name : 'Missing challenge');
+      return `
+        <div class="hint-item d-flex justify-content-between align-items-center">
+          <div>
+            <span class="tag">${escHtml(item.type)}</span>
+            <strong class="ms-2">${escHtml(item.title || target)}</strong>
+            <span class="text-muted small ms-2">${escHtml(target)}</span>
+          </div>
+          <button type="button" class="btn btn-sm btn-danger" onclick="deleteModuleItem(${item.id})">x</button>
+        </div>`;
+    }
+
+    function renderModuleTargetOptions(type) {
+      if (type === 'challenge') {
+        return adminChallengesCache.map(ch => `<option value="${ch.id}">${escHtml(ch.name)} (${escHtml(ch.category || '')})</option>`).join('');
+      }
+      return '';
+    }
+
+    function syncModuleItemTarget(moduleID) {
+      const type = document.getElementById('module-item-type-' + moduleID).value;
+      const target = document.getElementById('module-item-target-' + moduleID);
+      const contentWrap = document.getElementById('module-item-content-wrap-' + moduleID);
+      if (target) {
+        target.innerHTML = renderModuleTargetOptions('challenge');
+        target.disabled = type !== 'challenge';
+      }
+      if (contentWrap) contentWrap.style.display = type === 'theory' ? '' : 'none';
+    }
+
+    function editModuleById(id) {
+      const m = adminModulesCache.find(x => x.id === id);
+      if (!m) return;
+      document.getElementById('module-form-title').textContent = 'Edit Module';
+      document.getElementById('module-id').value = m.id;
+      document.getElementById('module-title').value = m.title || '';
+      document.getElementById('module-slug').value = m.slug || '';
+      document.getElementById('module-description').value = m.description || '';
+      document.getElementById('module-sort').value = m.sort_order || 0;
+      document.getElementById('module-draft').checked = !!m.draft;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function resetModuleForm() {
+      document.getElementById('module-form-title').textContent = 'New Module';
+      document.getElementById('module-id').value = '';
+      document.getElementById('module-title').value = '';
+      document.getElementById('module-slug').value = '';
+      document.getElementById('module-description').value = '';
+      document.getElementById('module-sort').value = '0';
+      document.getElementById('module-draft').checked = false;
+    }
+
+    async function saveModule() {
+      const id = document.getElementById('module-id').value;
+      const body = {
+        title: document.getElementById('module-title').value.trim(),
+        slug: document.getElementById('module-slug').value.trim(),
+        description: document.getElementById('module-description').value,
+        sort_order: parseInt(document.getElementById('module-sort').value, 10) || 0,
+        draft: document.getElementById('module-draft').checked,
+      };
+      try {
+        if (id) {
+          await apiFetch('/api/admin/modules/' + id, { method: 'PUT', body: JSON.stringify(body) });
+        } else {
+          await apiFetch('/api/admin/modules', { method: 'POST', body: JSON.stringify(body) });
+        }
+        resetModuleForm();
+        loadAdminModules();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function deleteModule(id) {
+      if (!confirm('Delete this module?')) return;
+      await apiFetch('/api/admin/modules/' + id, { method: 'DELETE' });
+      resetModuleForm();
+      loadAdminModules();
+    }
+
+    async function addModuleItem(moduleID) {
+      const type = document.getElementById('module-item-type-' + moduleID).value;
+      const targetID = parseInt(document.getElementById('module-item-target-' + moduleID).value, 10);
+      const body = {
+        type,
+        title: document.getElementById('module-item-title-' + moduleID).value.trim(),
+        content: document.getElementById('module-item-content-' + moduleID)?.value || '',
+        sort_order: parseInt(document.getElementById('module-item-sort-' + moduleID).value, 10) || 0,
+      };
+      if (type === 'challenge') body.challenge_id = targetID;
+      try {
+        await apiFetch('/api/admin/modules/' + moduleID + '/items', { method: 'POST', body: JSON.stringify(body) });
+        loadAdminModules();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function deleteModuleItem(id) {
+      if (!confirm('Delete this module item?')) return;
+      await apiFetch('/api/admin/modules/items/' + id, { method: 'DELETE' });
+      loadAdminModules();
+    }
+
     const settingsFieldMap = {
       themeMeta: [
         { id: 'cfg-theme-name', key: 'ctf_theme', kind: 'string' },
@@ -1558,9 +2453,18 @@
     (async () => {
       await initI18n();
       await loadPluginOptions();
+      await loadDeployTargetOptions();
+      document.getElementById('ch-challenge-type').addEventListener('change', () => {
+        syncChallengeTypeUI(!document.getElementById('ch-id').value);
+      });
+      document.getElementById('ch-checker-config').addEventListener('blur', renderCheckerBuilder);
+      document.getElementById('ch-deploy-config').addEventListener('blur', renderDeployBuilder);
+      document.getElementById('ch-deploy-type').addEventListener('change', () => syncChallengeTypeUI(false));
+      document.getElementById('ch-deploy-backend').addEventListener('change', renderDeployBuilder);
+      window.addEventListener('hashchange', showInitialAdminTab);
       const user = await getMe();
       if (!user || user.role !== 'admin') { location.href = '/'; return; }
-      loadAdminChallenges();
+      showInitialAdminTab();
     })();
   </script>
 </body>

@@ -12,7 +12,13 @@ import (
 )
 
 func (s *Server) handleRegister(c echo.Context) error {
-	if !s.cfg.CTF.RegistrationOpen {
+	registrationOpen := s.cfg.CTF.RegistrationOpen
+	if settings := s.publicSettings(); len(settings) > 0 {
+		if value, ok := settings["registration_open"].(bool); ok {
+			registrationOpen = value
+		}
+	}
+	if !registrationOpen {
 		return c.JSON(http.StatusForbidden, map[string]string{"error": "registration is closed"})
 	}
 	var req struct {
@@ -56,8 +62,7 @@ func (s *Server) handleRegister(c echo.Context) error {
 	}
 	setAuthCookie(c, token)
 	return c.JSON(http.StatusCreated, map[string]any{
-		"token": token,
-		"user":  user,
+		"user": user,
 	})
 }
 
@@ -86,8 +91,7 @@ func (s *Server) handleLogin(c echo.Context) error {
 	}
 	setAuthCookie(c, token)
 	return c.JSON(http.StatusOK, map[string]any{
-		"token": token,
-		"user":  user,
+		"user": user,
 	})
 }
 
@@ -186,6 +190,6 @@ func setAuthCookie(c echo.Context, token string) {
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   c.Request().TLS != nil,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: http.SameSiteStrictMode,
 	})
 }

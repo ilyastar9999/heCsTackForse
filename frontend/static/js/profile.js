@@ -1,12 +1,11 @@
-// profile.js
-
-function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+﻿function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;');
 }
 
-function loadProfile(user) {
+function loadProfile(user, cfg = {}) {
   const root = document.getElementById('profile-root');
   const initial = user.username.charAt(0).toUpperCase();
+  const teamMode = !!cfg.team_mode;
   root.innerHTML = `
     <div class="row g-4">
       <div class="col-md-4">
@@ -15,7 +14,7 @@ function loadProfile(user) {
           <h3 class="mb-1">${escHtml(user.username)}</h3>
           <p class="text-muted mb-1">${escHtml(user.email || '')} &bull; <span class="badge bg-secondary">${escHtml(user.role)}</span></p>
           ${user.affiliation ? `<p class="text-muted small mb-1">${escHtml(user.affiliation)}</p>` : ''}
-          ${user.country ? `<p class="text-muted small mb-1">&#127760; ${escHtml(user.country)}</p>` : ''}
+          ${user.country ? `<p class="text-muted small mb-1">${escHtml(user.country)}</p>` : ''}
           ${user.website ? `<p class="text-muted small mb-2"><a href="${escHtml(user.website)}" target="_blank" rel="noopener">${escHtml(user.website)}</a></p>` : ''}
           <hr style="border-color:var(--ctf-border)">
           <div class="row text-center">
@@ -26,16 +25,15 @@ function loadProfile(user) {
           </div>
         </div>
 
+        ${teamMode ? `
         <div class="card mt-3 p-3" id="team-card">
           <h6 class="mb-2" style="color:var(--ctf-muted);text-transform:uppercase;font-size:.75rem;letter-spacing:.06em" data-i18n="profile.team">Team</h6>
-          <div id="team-info" class="text-muted small">Loading…</div>
-        </div>
+          <div id="team-info" class="text-muted small">Loading...</div>
+        </div>` : ''}
 
-        <!-- Settings card -->
         <div class="card mt-3 p-3">
           <h6 class="mb-3" style="color:var(--ctf-muted);text-transform:uppercase;font-size:.75rem;letter-spacing:.06em" data-i18n="profile.settings">Settings</h6>
 
-          <!-- Update profile form -->
           <form id="profile-update-form" onsubmit="updateProfile(event)">
             <div class="mb-2">
               <label class="form-label small" data-i18n="profile.affiliation">Affiliation</label>
@@ -55,7 +53,6 @@ function loadProfile(user) {
 
           <hr style="border-color:var(--ctf-border)">
 
-          <!-- Change password form -->
           <h6 class="mb-2 small" data-i18n="profile.change_password">Change Password</h6>
           <form id="password-form" onsubmit="changePassword(event)">
             <div class="mb-2">
@@ -77,7 +74,7 @@ function loadProfile(user) {
         <div class="card">
           <div class="card-header" data-i18n="profile.recent_solves">Recent Solves</div>
           <div id="solves-list" class="p-3">
-            <div class="text-muted small">Loading…</div>
+            <div class="text-muted small">Loading...</div>
           </div>
         </div>
       </div>
@@ -85,22 +82,21 @@ function loadProfile(user) {
 
   applyI18n();
 
-  // Load team
-  apiFetch('/api/teams/' + user.id).then(tm => {
-    document.getElementById('team-info').innerHTML = `<strong>${escHtml(tm.name)}</strong><br>Score: ${tm.score}`;
-  }).catch(() => {
-    document.getElementById('team-info').innerHTML =
-      `<span class="text-muted" data-i18n="profile.not_in_team">Not in a team.</span><br>
-       <button class="btn btn-sm btn-outline-primary mt-2" onclick="showCreateTeam()">${t('profile.create_team')}</button>
-       <button class="btn btn-sm btn-secondary mt-2 ms-1" onclick="showJoinTeam()">${t('profile.join_team')}</button>
-       <div id="team-form" class="mt-3"></div>`;
-  });
+  if (teamMode) {
+    apiFetch('/api/teams/' + user.id).then(tm => {
+      document.getElementById('team-info').innerHTML = `<strong>${escHtml(tm.name)}</strong><br>Score: ${tm.score}`;
+    }).catch(() => {
+      document.getElementById('team-info').innerHTML =
+        `<span class="text-muted" data-i18n="profile.not_in_team">Not in a team.</span><br>
+         <button class="btn btn-sm btn-outline-primary mt-2" onclick="showCreateTeam()">${t('profile.create_team')}</button>
+         <button class="btn btn-sm btn-secondary mt-2 ms-1" onclick="showJoinTeam()">${t('profile.join_team')}</button>
+         <div id="team-form" class="mt-3"></div>`;
+    });
+  }
 
-  // Load solves
   apiFetch('/api/auth/me').then(me => {
-    // Show recent solve count
     const solvesEl = document.getElementById('solves-list');
-    if (!me) { solvesEl.innerHTML = '<p class="text-muted small">—</p>'; return; }
+    if (!me) { solvesEl.innerHTML = '<p class="text-muted small">-</p>'; return; }
     solvesEl.innerHTML = `<p class="text-muted small">${me.score} points total.</p>`;
   }).catch(() => {});
 }
@@ -172,7 +168,7 @@ async function createTeam() {
   const msgEl = document.getElementById('team-msg');
   try {
     const tm = await apiFetch('/api/teams', { method: 'POST', body: JSON.stringify({ name }) });
-    msgEl.innerHTML = `<div class="alert alert-success small">Team <strong>${escHtml(tm.name)}</strong> created! Invite code: <code>${escHtml(tm.invite_code)}</code></div>`;
+    msgEl.innerHTML = `<div class="alert alert-success small">Team <strong>${escHtml(tm.name)}</strong> created. Invite code: <code>${escHtml(tm.invite_code)}</code></div>`;
   } catch(err) {
     msgEl.innerHTML = `<div class="alert alert-danger small">${escHtml(err.message)}</div>`;
   }
@@ -183,7 +179,7 @@ async function joinTeam() {
   const msgEl = document.getElementById('team-msg');
   try {
     const tm = await apiFetch('/api/teams/join', { method: 'POST', body: JSON.stringify({ invite_code }) });
-    msgEl.innerHTML = `<div class="alert alert-success small">Joined team <strong>${escHtml(tm.name)}</strong>!</div>`;
+    msgEl.innerHTML = `<div class="alert alert-success small">Joined team <strong>${escHtml(tm.name)}</strong>.</div>`;
   } catch(err) {
     msgEl.innerHTML = `<div class="alert alert-danger small">${escHtml(err.message)}</div>`;
   }

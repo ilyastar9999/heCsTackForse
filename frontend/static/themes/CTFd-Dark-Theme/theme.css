@@ -1,0 +1,9 @@
+@import url("/ctfd-themes/CTFd-Dark-Theme/dark-theme/static/css/vendor/bootstrap.min.css");
+@import url("/ctfd-themes/CTFd-Dark-Theme/dark-theme/static/css/vendor/font-awesome/fontawesome-fonts.css");
+@import url("/ctfd-themes/CTFd-Dark-Theme/dark-theme/static/css/vendor/font-awesome/fontawesome-all.min.css");
+@import url("/ctfd-themes/CTFd-Dark-Theme/dark-theme/static/css/vendor/font.css");
+@import url("/ctfd-themes/CTFd-Dark-Theme/dark-theme/static/css/jumbotron.css");
+@import url("/ctfd-themes/CTFd-Dark-Theme/dark-theme/static/css/sticky-footer.css");
+@import url("/ctfd-themes/CTFd-Dark-Theme/dark-theme/static/css/base.css");
+@import url("../shared/hecstack-adapter.css");
+

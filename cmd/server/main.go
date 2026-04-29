@@ -67,6 +67,36 @@ func main() {
 		for _, name := range catalog.ChallengeTypes {
 			plugin.Default.RegisterChallengeType(bridge.ChallengeType(name))
 		}
+		for _, rawWidget := range catalog.HomeWidgets {
+			widgetMap, ok := rawWidget.(map[string]any)
+			if !ok {
+				continue
+			}
+			name, _ := widgetMap["name"].(string)
+			title, _ := widgetMap["title"].(string)
+			body, _ := widgetMap["body"].(string)
+			url, _ := widgetMap["url"].(string)
+			plugin.Default.RegisterHomeWidget(plugin.HomeWidget{
+				Name:  name,
+				Title: title,
+				Body:  body,
+				URL:   url,
+			})
+		}
+		for _, rawMenu := range catalog.AdminMenu {
+			menuMap, ok := rawMenu.(map[string]any)
+			if !ok {
+				continue
+			}
+			name, _ := menuMap["name"].(string)
+			title, _ := menuMap["title"].(string)
+			route, _ := menuMap["route"].(string)
+			plugin.Default.RegisterAdminMenu(plugin.AdminMenuEntry{
+				Name:  name,
+				Title: title,
+				Route: route,
+			})
+		}
 		defer func() {
 			if err := bridge.Close(); err != nil {
 				log.Printf("warning: plugin bridge shutdown failed: %v", err)
@@ -82,8 +112,13 @@ func main() {
 
 	if cfg.Deployer.Backends.Docker.Enabled {
 		mgr.Register(&deployer.DockerDeployer{
-			Registry: cfg.Deployer.Backends.Docker.Registry,
-			Network:  cfg.Deployer.Backends.Docker.Network,
+			Registry:       cfg.Deployer.Backends.Docker.Registry,
+			Host:           cfg.Deployer.Backends.Docker.Host,
+			TLSVerify:      cfg.Deployer.Backends.Docker.TLSVerify,
+			CertPath:       cfg.Deployer.Backends.Docker.CertPath,
+			Network:        cfg.Deployer.Backends.Docker.Network,
+			ChallengesDir:  cfg.Deployer.Backends.Docker.ChallengesDir,
+			LocalTagPrefix: cfg.Deployer.Backends.Docker.LocalTagPrefix,
 		})
 	}
 
@@ -117,6 +152,9 @@ func main() {
 	}
 
 	srv := api.NewServer(cfg, database, mgr, adEngine)
+	cleanupCtx, cleanupCancel := context.WithCancel(context.Background())
+	defer cleanupCancel()
+	srv.StartInstanceCleanup(cleanupCtx, time.Minute)
 
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 	httpServer := &http.Server{
@@ -139,6 +177,7 @@ func main() {
 	<-quit
 
 	log.Println("shutting down...")
+	cleanupCancel()
 	if adEngine != nil {
 		adEngine.Stop()
 	}

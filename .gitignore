@@ -1,10 +1,15 @@
-*.db
+﻿*.db
 *.db-shm
 *.db-wal
 config.yaml
+.env
 /ctf
 # build artifacts
 /server
+__pycache__/
+*.pyc
 
 # Docker secrets (override per-environment; keep docker/config.yaml template)
 docker/.env
+.codex-run/
+
