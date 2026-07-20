@@ -254,6 +254,11 @@ func (s *Server) handleAdminUpdateUser(c echo.Context) error {
 		}
 	}
 
+	if req.Score != nil || req.Banned != nil || req.Hidden != nil {
+		s.InvalidateScoreboardCache()
+		s.InvalidateStatisticsCache()
+	}
+
 	return c.JSON(http.StatusOK, map[string]string{"message": "updated"})
 }
 
@@ -272,6 +277,8 @@ func (s *Server) handleAdminDeleteUser(c echo.Context) error {
 	if _, err := s.db.Exec("DELETE FROM users WHERE id=?", id); err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
 	}
+	s.InvalidateScoreboardCache()
+	s.InvalidateStatisticsCache()
 	return c.JSON(http.StatusOK, map[string]string{"message": "deleted"})
 }
 
@@ -287,6 +294,8 @@ func (s *Server) handleAdminResetScore(c echo.Context) error {
 	if _, err := s.db.Exec("UPDATE users SET score=0 WHERE id=?", id); err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
 	}
+	s.InvalidateScoreboardCache()
+	s.InvalidateStatisticsCache()
 	return c.JSON(http.StatusOK, map[string]string{"message": "score reset"})
 }
 
@@ -328,7 +337,7 @@ func (s *Server) handleAdminCreateUserField(c echo.Context) error {
 		req.Name, req.FieldType, req.Required, req.Public, req.Description,
 	)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error: " + err.Error()})
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
 	}
 	req.ID = id
 	return c.JSON(http.StatusCreated, req)

@@ -115,3 +115,23 @@ func (d *DB) InsertGetID(query string, args ...any) (int64, error) {
 	}
 	return res.LastInsertId()
 }
+
+// Transaction executes fn within a database transaction. If fn returns an error,
+// the transaction is rolled back. If fn returns nil, it is committed.
+func (db *DB) Transaction(fn func(tx *sql.Tx) error) error {
+	tx, err := db.DB.Begin()
+	if err != nil {
+		return err
+	}
+	if err := fn(tx); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	return tx.Commit()
+}
+
+// Rewrite exposes the internal placeholder rewriting (? → $N for Postgres)
+// so callers can use it when building queries for a raw *sql.Tx.
+func (db *DB) Rewrite(query string) string {
+	return db.rewrite(query)
+}

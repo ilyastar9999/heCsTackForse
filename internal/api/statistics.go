@@ -1,9 +1,13 @@
 package api
 
 import (
+	"context"
 	"net/http"
+	"time"
 
 	"github.com/labstack/echo/v4"
+
+	"github.com/ilyastar9999/heCsTackForse/internal/cache"
 )
 
 type CategoryStat struct {
@@ -13,6 +17,30 @@ type CategoryStat struct {
 }
 
 func (s *Server) handleStatistics(c echo.Context) error {
+	ttl := cache.ParseDuration(s.cfg.Cache.TTLStatistics, 60*time.Second)
+	cacheKey := cache.Key("statistics", "summary")
+
+	type cachedStats struct {
+		UsersCount         int            `json:"users_count"`
+		TeamsCount         int            `json:"teams_count"`
+		ChallengesCount    int            `json:"challenges_count"`
+		SubmissionsCount   int            `json:"submissions_count"`
+		CorrectSubmissions int            `json:"correct_submissions"`
+		Categories         []CategoryStat `json:"categories"`
+	}
+
+	var cached cachedStats
+	if s.cache.Get(context.Background(), cacheKey, &cached) {
+		return c.JSON(http.StatusOK, map[string]any{
+			"users_count":         cached.UsersCount,
+			"teams_count":         cached.TeamsCount,
+			"challenges_count":    cached.ChallengesCount,
+			"submissions_count":   cached.SubmissionsCount,
+			"correct_submissions": cached.CorrectSubmissions,
+			"categories":          cached.Categories,
+		})
+	}
+
 	var usersCount, teamsCount, challengesCount, submissionsCount, correctSubmissions int
 
 	if err := s.db.QueryRow(`
@@ -61,6 +89,16 @@ func (s *Server) handleStatistics(c echo.Context) error {
 		categories = []CategoryStat{}
 	}
 
+	result := cachedStats{
+		UsersCount:         usersCount,
+		TeamsCount:         teamsCount,
+		ChallengesCount:    challengesCount,
+		SubmissionsCount:   submissionsCount,
+		CorrectSubmissions: correctSubmissions,
+		Categories:         categories,
+	}
+	s.cache.Set(context.Background(), cacheKey, result, ttl)
+
 	return c.JSON(http.StatusOK, map[string]any{
 		"users_count":         usersCount,
 		"teams_count":         teamsCount,
@@ -69,4 +107,11 @@ func (s *Server) handleStatistics(c echo.Context) error {
 		"correct_submissions": correctSubmissions,
 		"categories":          categories,
 	})
+}
+
+// InvalidateStatisticsCache removes cached statistics data.
+func (s *Server) InvalidateStatisticsCache() {
+	if s.cache != nil {
+		s.cache.InvalidatePrefix(context.Background(), "statistics:*")
+	}
 }

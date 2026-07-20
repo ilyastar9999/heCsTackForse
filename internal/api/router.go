@@ -14,6 +14,7 @@ import (
 	echomw "github.com/labstack/echo/v4/middleware"
 
 	"github.com/ilyastar9999/heCsTackForse/internal/ad"
+	"github.com/ilyastar9999/heCsTackForse/internal/cache"
 	"github.com/ilyastar9999/heCsTackForse/internal/config"
 	"github.com/ilyastar9999/heCsTackForse/internal/db"
 	"github.com/ilyastar9999/heCsTackForse/internal/deployer"
@@ -25,12 +26,13 @@ type Server struct {
 	db          *db.DB
 	deployer    *deployer.Manager
 	adEngine    *ad.Engine
+	cache       *cache.Cache
 	e           *echo.Echo
 	rateLimiter *rateLimiter
 }
 
-func NewServer(cfg *config.Config, database *db.DB, mgr *deployer.Manager, adEng *ad.Engine) *Server {
-	s := &Server{cfg: cfg, db: database, deployer: mgr, adEngine: adEng, rateLimiter: newRateLimiter()}
+func NewServer(cfg *config.Config, database *db.DB, mgr *deployer.Manager, adEng *ad.Engine, c *cache.Cache) *Server {
+	s := &Server{cfg: cfg, db: database, deployer: mgr, adEngine: adEng, cache: c, rateLimiter: newRateLimiter()}
 	if err := s.bootstrapDeployScheduler(); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: failed to bootstrap deploy scheduler: %v\n", err)
 	}
@@ -90,10 +92,21 @@ func (s *Server) buildRouter() *echo.Echo {
 	e.GET("/statistics", func(c echo.Context) error { return c.File(sd + "/statistics.html") })
 	e.GET("/page", func(c echo.Context) error { return c.File(sd + "/page.html") })
 
+	// Health checks
+	e.GET("/healthz", func(c echo.Context) error {
+		return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
+	})
+	e.GET("/ready", func(c echo.Context) error {
+		if err := s.db.Ping(); err != nil {
+			return c.JSON(http.StatusServiceUnavailable, map[string]string{"status": "not ready"})
+		}
+		return c.JSON(http.StatusOK, map[string]string{"status": "ready"})
+	})
+
 	// API routes — public
 	api := e.Group("/api")
-	api.POST("/auth/register", s.handleRegister)
-	api.POST("/auth/login", s.handleLogin)
+	api.POST("/auth/register", s.handleRegister, s.rateLimitMiddleware(5, time.Minute))
+	api.POST("/auth/login", s.handleLogin, s.rateLimitMiddleware(10, time.Minute))
 	api.GET("/setup/status", s.handleSetupStatus)
 	api.POST("/setup", s.handleSetup)
 	api.GET("/scoreboard", s.handleScoreboard)
@@ -109,7 +122,7 @@ func (s *Server) buildRouter() *echo.Echo {
 	api.GET("/challenge-types", s.handleChallengeTypes)
 
 	// Authenticated
-	auth := api.Group("", s.authMiddleware)
+	auth := api.Group("", s.authMiddleware, s.csrfOriginMiddleware)
 	auth.POST("/auth/logout", s.handleLogout)
 	auth.GET("/auth/me", s.handleMe)
 	auth.PUT("/auth/me", s.handleUpdateMe)
@@ -129,6 +142,13 @@ func (s *Server) buildRouter() *echo.Echo {
 	auth.POST("/challenges/:id/workflow/check", s.handleChallengeWorkflowCheck, s.rateLimitMiddleware(10, time.Minute))
 	auth.POST("/challenges/:id/workflow/restart-vote", s.handleChallengeWorkflowRestartVote, s.rateLimitMiddleware(10, time.Minute))
 	auth.POST("/challenges/:id/workflow/restart", s.handleChallengeWorkflowAdminRestart, s.rateLimitMiddleware(10, time.Minute))
+
+	// Per-challenge AD routes
+	auth.GET("/challenges/:id/sploits", s.handleADListChallengeSploits)
+	auth.POST("/challenges/:id/sploits", s.handleADCreateChallengeSploit)
+	auth.GET("/challenges/:id/vpn", s.handleADGetVPN)
+	auth.GET("/challenges/:id/vpn/status", s.handleADVPNStatus)
+	auth.POST("/challenges/:id/vpn/sync", s.handleADSyncVPN, s.rateLimitMiddleware(10, time.Minute))
 
 	auth.GET("/users/:id", s.handleGetUser)
 	auth.POST("/teams", s.handleCreateTeam)
@@ -151,7 +171,7 @@ func (s *Server) buildRouter() *echo.Echo {
 	auth.POST("/ad/flags/submit", s.handleADSubmitFlag, s.rateLimitMiddleware(20, 60*time.Second))
 
 	// Admin
-	admin := api.Group("/admin", s.authMiddleware, s.adminMiddleware)
+	admin := api.Group("/admin", s.authMiddleware, s.adminMiddleware, s.csrfOriginMiddleware)
 	admin.GET("/challenges", s.handleAdminListChallenges)
 	admin.POST("/challenges", s.handleAdminCreateChallenge)
 	admin.PUT("/challenges/:id", s.handleAdminUpdateChallenge)

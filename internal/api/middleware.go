@@ -72,7 +72,9 @@ func (s *Server) authenticateRequest(c echo.Context) (int64, string, error) {
 
 	// Deny access to banned users (DB check; fast because id is PK-indexed).
 	var banned bool
-	_ = s.db.QueryRow("SELECT COALESCE(banned, 0) FROM users WHERE id=?", userID).Scan(&banned)
+	if err := s.db.QueryRow("SELECT COALESCE(banned, FALSE) FROM users WHERE id=?", userID).Scan(&banned); err != nil {
+		return 0, "", errUnauthorized
+	}
 	if banned {
 		return 0, "", errBanned
 	}
@@ -159,6 +161,115 @@ func (s *Server) rateLimitMiddleware(limit int, window time.Duration) echo.Middl
 			return next(c)
 		}
 	}
+}
+
+// csrfOriginMiddleware checks that state-changing requests (POST, PUT, DELETE)
+// carry a valid Origin or Referer header pointing to the same host. This
+// provides defense-in-depth on top of SameSite=Strict cookies.
+func (s *Server) csrfOriginMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		method := c.Request().Method
+		if method != http.MethodPost && method != http.MethodPut && method != http.MethodDelete {
+			return next(c)
+		}
+
+		// Trusted API clients using Bearer tokens are not vulnerable to CSRF.
+		if strings.HasPrefix(c.Request().Header.Get("Authorization"), "Bearer ") {
+			return next(c)
+		}
+
+		origin := c.Request().Header.Get("Origin")
+		referer := c.Request().Header.Get("Referer")
+		host := c.Request().Host
+		if host == "" {
+			host = c.Request().Header.Get("Host")
+		}
+
+		// Allow requests with no Origin or Referer (non-browser clients, same-origin form posts).
+		if origin == "" && referer == "" {
+			return next(c)
+		}
+
+		if origin != "" {
+			// Origin header is present — validate it matches the request host.
+			originHost := extractHost(origin)
+			if originHost != host && originHost != "" {
+				return c.JSON(http.StatusForbidden, map[string]string{"error": "cross-origin request rejected"})
+			}
+			return next(c)
+		}
+
+		// Fall back to Referer check.
+		refererHost := extractHost(referer)
+		if refererHost != host && refererHost != "" {
+			return c.JSON(http.StatusForbidden, map[string]string{"error": "cross-origin request rejected"})
+		}
+		return next(c)
+	}
+}
+
+// extractHost parses the host portion from a URL or origin string.
+func extractHost(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	// Strip scheme
+	if idx := strings.Index(raw, "://"); idx != -1 {
+		raw = raw[idx+3:]
+	}
+	// Strip port
+	if idx := strings.IndexByte(raw, '/'); idx != -1 {
+		raw = raw[:idx]
+	}
+	if idx := strings.IndexByte(raw, ':'); idx != -1 {
+		raw = raw[:idx]
+	}
+	return strings.ToLower(raw)
+}
+
+// validateUsername checks that a username is non-empty, within length limits,
+// and contains only safe characters (alphanumeric, underscore, hyphen).
+func validateUsername(s string) error {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return fmt.Errorf("username is required")
+	}
+	if len(s) > 32 {
+		return fmt.Errorf("username must be at most 32 characters")
+	}
+	for _, r := range s {
+		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '-') {
+			return fmt.Errorf("username contains invalid characters")
+		}
+	}
+	return nil
+}
+
+// validateEmail performs basic email format and length validation.
+func validateEmail(s string) error {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return fmt.Errorf("email is required")
+	}
+	if len(s) > 255 {
+		return fmt.Errorf("email must be at most 255 characters")
+	}
+	if !strings.Contains(s, "@") || !strings.Contains(s, ".") {
+		return fmt.Errorf("invalid email format")
+	}
+	return nil
+}
+
+// validatePassword enforces a minimum password length.
+func validatePassword(s string) error {
+	if len(s) < 8 {
+		return fmt.Errorf("password must be at least 8 characters")
+	}
+	if len(s) > 128 {
+		return fmt.Errorf("password must be at most 128 characters")
+	}
+	return nil
 }
 
 func getUserID(c echo.Context) int64 {

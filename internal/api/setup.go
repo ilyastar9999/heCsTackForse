@@ -29,7 +29,6 @@ func (s *Server) handleSetup(c echo.Context) error {
 
 	var req struct {
 		SiteName         string `json:"site_name"`
-		Mode             string `json:"mode"`
 		TeamMode         bool   `json:"team_mode"`
 		RegistrationOpen bool   `json:"registration_open"`
 		Language         string `json:"language"`
@@ -42,19 +41,11 @@ func (s *Server) handleSetup(c echo.Context) error {
 	}
 
 	req.SiteName = strings.TrimSpace(req.SiteName)
-	req.Mode = strings.TrimSpace(strings.ToLower(req.Mode))
-	req.Language = strings.TrimSpace(strings.ToLower(req.Language))
 	req.AdminUsername = strings.TrimSpace(req.AdminUsername)
 	req.AdminEmail = strings.TrimSpace(req.AdminEmail)
 
 	if req.SiteName == "" {
 		req.SiteName = "heCsTackForse CTF"
-	}
-	if req.Mode == "" {
-		req.Mode = "ctf"
-	}
-	if req.Mode != "ctf" && req.Mode != "ad" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "mode must be ctf or ad"})
 	}
 	if req.Language == "" {
 		req.Language = "en"
@@ -84,7 +75,7 @@ func (s *Server) handleSetup(c echo.Context) error {
 
 	settings := map[string]any{
 		"ctf_name":          req.SiteName,
-		"ctf_mode":          req.Mode,
+		"ctf_mode":          "ctf",
 		"language":          req.Language,
 		"registration_open": req.RegistrationOpen,
 		"team_mode":         req.TeamMode,
@@ -103,7 +94,7 @@ func (s *Server) handleSetup(c echo.Context) error {
 	}
 
 	s.cfg.CTF.Name = req.SiteName
-	s.cfg.CTF.Mode = req.Mode
+	s.cfg.CTF.Mode = "ctf"
 	s.cfg.CTF.TeamMode = req.TeamMode
 	s.cfg.CTF.RegistrationOpen = req.RegistrationOpen
 	s.cfg.CTF.Language = req.Language

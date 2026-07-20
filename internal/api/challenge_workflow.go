@@ -202,7 +202,7 @@ func (s *Server) handleChallengeWorkflowRestartVote(c echo.Context) error {
 		if err == sql.ErrNoRows {
 			return c.JSON(http.StatusBadRequest, map[string]string{"error": "join a team before voting to restart this service"})
 		}
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "internal error"})
 	}
 
 	state := s.restartVoteState(challengeID, userID)
@@ -220,7 +220,7 @@ func (s *Server) handleChallengeWorkflowRestartVote(c echo.Context) error {
 	if err := s.restartAlwaysOnChallenge(challengeID); err != nil {
 		s.recordRestartEvent(challengeID, userID, "vote_threshold", "failed", err.Error())
 		return c.JSON(http.StatusServiceUnavailable, map[string]any{
-			"error":        err.Error(),
+			"error":        "restart failed",
 			"restart_vote": state,
 			"restarted":    false,
 		})
@@ -270,7 +270,7 @@ func (s *Server) handleChallengeWorkflowAdminRestart(c echo.Context) error {
 
 	if err := s.restartAlwaysOnChallenge(challengeID); err != nil {
 		s.recordRestartEvent(challengeID, getUserID(c), "admin", "failed", err.Error())
-		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": err.Error()})
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "restart failed"})
 	}
 	_, _ = s.db.Exec(`DELETE FROM challenge_restart_votes WHERE challenge_id=?`, challengeID)
 	s.recordRestartEvent(challengeID, getUserID(c), "admin", "success", "service restart triggered by admin")
@@ -329,7 +329,7 @@ func (s *Server) handleChallengeWorkflowCheck(c echo.Context) error {
 
 	st, err := s.adEngine.ProbeService(challengeID, ownerID, challengeType, checkerConfig, connectionInfo)
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "probe failed"})
 	}
 	st.MaxScore = adServiceMaxScore(checkerConfig)
 	return c.JSON(http.StatusOK, st)
@@ -457,7 +457,7 @@ func (s *Server) restartEligibleVoters() int {
 	if s.cfg.CTF.TeamMode {
 		_ = s.db.QueryRow(`SELECT COUNT(*) FROM teams`).Scan(&count)
 	} else {
-		_ = s.db.QueryRow(`SELECT COUNT(*) FROM users WHERE banned=0`).Scan(&count)
+		_ = s.db.QueryRow(`SELECT COUNT(*) FROM users WHERE banned=FALSE`).Scan(&count)
 	}
 	return count
 }

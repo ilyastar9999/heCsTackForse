@@ -1,4 +1,15 @@
 services:
+  valkey:
+    image: valkey/valkey:8
+    restart: unless-stopped
+    volumes:
+      - valkey_data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -24,9 +35,11 @@ services:
       - ./challenges:/app/challenges:ro
       - ./themes:/app/themes:ro
       - sploits:/tmp/sploits
-      - /var/run/docker.sock:/var/run/docker.sock
+
     depends_on:
       postgres:
+        condition: service_healthy
+      valkey:
         condition: service_healthy
     environment:
       TZ: ${TZ:-UTC}
@@ -41,3 +54,4 @@ services:
 volumes:
   postgres_data:
   sploits:
+  valkey_data:

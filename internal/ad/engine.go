@@ -135,20 +135,10 @@ func (e *Engine) runRound(round int64) {
 	log.Printf("ad engine: round %d starting", round)
 	start := time.Now()
 
-	// Record round start
-	_, _ = e.db.Exec(
-		e.db.InsertIgnore(`INSERT INTO ad_rounds (round, started_at) VALUES (?, ?)`),
-		round, start,
-	)
-
 	e.rotateFlags(round)
 	e.runCheckers(round)
 	e.runSploits(round)
 
-	_, _ = e.db.Exec(
-		`UPDATE ad_rounds SET finished_at=? WHERE round=?`,
-		time.Now(), round,
-	)
 	log.Printf("ad engine: round %d finished in %s", round, time.Since(start).Round(time.Millisecond))
 }
 
@@ -164,7 +154,8 @@ func (e *Engine) rotateFlags(round int64) {
 	rows, err := e.db.Query(`
 		SELECT i.challenge_id, i.team_id, i.user_id
 		FROM instances i
-		WHERE i.status='running'
+		JOIN challenges ch ON ch.id = i.challenge_id
+		WHERE i.status='running' AND ch.challenge_type IN ('attack_defence_attack', 'attack_defence_defense')
 	`)
 	if err != nil {
 		log.Printf("ad: rotateFlags query error: %v", err)
@@ -183,6 +174,10 @@ func (e *Engine) rotateFlags(round int64) {
 		_, _ = e.db.Exec(
 			`INSERT INTO ad_flags (challenge_id, team_id, flag, round) VALUES (?, ?, ?, ?)`,
 			challengeID, teamID.Int64, flag, round,
+		)
+		_, _ = e.db.Exec(
+			e.db.InsertIgnore(`INSERT INTO ad_rounds (round, challenge_id, started_at) VALUES (?, ?, ?)`),
+			round, challengeID, time.Now(),
 		)
 	}
 }
@@ -222,7 +217,7 @@ func (e *Engine) runCheckers(round int64) {
 		SELECT i.id, i.challenge_id, i.team_id, i.connection_info, ch.challenge_type, ch.checker_config
 		FROM instances i
 		JOIN challenges ch ON ch.id = i.challenge_id
-		WHERE i.status='running'
+		WHERE i.status='running' AND ch.challenge_type IN ('attack_defence_attack', 'attack_defence_defense')
 	`)
 	if err != nil {
 		log.Printf("ad: runCheckers query error: %v", err)
@@ -245,9 +240,57 @@ func (e *Engine) runCheckers(round int64) {
 		host, _ := connInfo["host"].(string)
 		port, _ := connInfo["port"].(string)
 
-		status, score := e.runChallengeChecks(challengeID, challengeType, checkerConfig, host, port, timeout)
-		e.recordServiceStatus(challengeID, teamID.Int64, status, round, score)
+		status, score, exploitJSON := e.runChallengeChecksDetailed(challengeID, challengeType, checkerConfig, host, port, timeout)
+		e.recordServiceStatus(challengeID, teamID.Int64, status, round, score, exploitJSON)
 	}
+}
+
+func (e *Engine) runChallengeChecksDetailed(challengeID int64, challengeType, checkerConfig, host, port string, timeout time.Duration) (status string, score int, exploitJSON string) {
+	if challengeType == "attack_defence_defense" {
+		var cfg models.ADCheckerConfig
+		_ = json.Unmarshal([]byte(checkerConfig), &cfg)
+		if len(cfg.DefenseChecks) > 0 {
+			total := 0
+			earned := 0
+			type checkResult struct {
+				Key    string `json:"key"`
+				Status string `json:"status"`
+				Points int    `json:"points"`
+			}
+			var results []checkResult
+			for i, check := range cfg.DefenseChecks {
+				points := check.Points
+				if points <= 0 {
+					points = 1
+				}
+				total += points
+				st, _ := e.execChecker(check.Script, host, port, timeout)
+				if st == "up" {
+					earned += points
+				}
+				if check.Key == "" {
+					cfg.DefenseChecks[i].Key = fmt.Sprintf("check_%d", i+1)
+				}
+				results = append(results, checkResult{
+					Key:    cfg.DefenseChecks[i].Key,
+					Status: st,
+					Points: points,
+				})
+			}
+			b, _ := json.Marshal(results)
+			exploitJSON = string(b)
+			switch {
+			case earned == 0:
+				return "down", 0, exploitJSON
+			case earned < total:
+				return "corrupt", earned, exploitJSON
+			default:
+				return "up", earned, exploitJSON
+			}
+		}
+	}
+	status, score = e.runChallengeChecks(challengeID, challengeType, checkerConfig, host, port, timeout)
+	return status, score, ""
 }
 
 func (e *Engine) runChallengeChecks(challengeID int64, challengeType, checkerConfig, host, port string, timeout time.Duration) (status string, score int) {
@@ -328,11 +371,11 @@ func (e *Engine) execChecker(script, host, port string, timeout time.Duration) (
 	return "up", 1
 }
 
-func (e *Engine) recordServiceStatus(challengeID, teamID int64, status string, round int64, score int) {
+func (e *Engine) recordServiceStatus(challengeID, teamID int64, status string, round int64, score int, exploitResults string) {
 	_, _ = e.db.Exec(
-		`INSERT INTO ad_services (challenge_id, team_id, status, round, score, checked_at)
-		 VALUES (?, ?, ?, ?, ?, ?)`,
-		challengeID, teamID, status, round, score, time.Now(),
+		`INSERT INTO ad_services (challenge_id, team_id, status, round, score, exploit_results, checked_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		challengeID, teamID, status, round, score, exploitResults, time.Now(),
 	)
 	// Award defence points to the team's score if service is up
 	if score > 0 {
@@ -387,6 +430,15 @@ func (e *Engine) runSploits(round int64) {
 	var mu sync.Mutex
 	var capturedFlags []string
 
+	// Track per-sploit target counts for the all-teams bonus.
+	type sploitCoverage struct {
+		totalTargets int
+		hitTargets   int
+		challengeID  int64
+		bucketKey    string
+	}
+	coverageMap := map[int64]*sploitCoverage{}
+
 	// For each sploit, run against every other team's instance of the same challenge
 	var wg sync.WaitGroup
 	for _, sp := range sploits {
@@ -430,6 +482,13 @@ func (e *Engine) runSploits(round int64) {
 		}
 		instRows.Close()
 
+		// Initialize coverage tracking for this sploit
+		coverageMap[sp.id] = &sploitCoverage{
+			totalTargets: len(targets),
+			challengeID:  sp.challengeID,
+			bucketKey:    sp.bucketKey,
+		}
+
 		for _, t := range targets {
 			t := t
 			sp := sp
@@ -460,12 +519,34 @@ func (e *Engine) runSploits(round int64) {
 				if len(flags) > 0 {
 					mu.Lock()
 					capturedFlags = append(capturedFlags, flags...)
+					c := coverageMap[sp.id]
+					if c != nil {
+						c.hitTargets++
+					}
 					mu.Unlock()
 				}
 			}()
 		}
 	}
 	wg.Wait()
+
+	// All-teams bonus: if a sploit exploited ALL target teams, award bonus
+	// points equal to one extra bucket's worth.
+	for sploitID, c := range coverageMap {
+		if c.totalTargets == 0 || c.hitTargets < c.totalTargets {
+			continue
+		}
+		bonusPoints := e.attackBucketPoints(c.challengeID, c.bucketKey)
+		if bonusPoints <= 0 {
+			continue
+		}
+		_, _ = e.db.Exec(`
+			INSERT INTO ad_sploit_results
+				(sploit_id, target_team_id, round, bucket_key, awarded_points, stdout, flags_captured, error, ran_at)
+			VALUES (?, 0, ?, ?, ?, '', 0, '', ?)`,
+			sploitID, round, "all_teams_bonus", bonusPoints, time.Now(),
+		)
+	}
 
 	if len(capturedFlags) > 0 {
 		e.submitFlagsToServer(capturedFlags, round)

@@ -12,6 +12,7 @@ import (
 
 	"github.com/ilyastar9999/heCsTackForse/internal/ad"
 	"github.com/ilyastar9999/heCsTackForse/internal/api"
+	"github.com/ilyastar9999/heCsTackForse/internal/cache"
 	"github.com/ilyastar9999/heCsTackForse/internal/config"
 	"github.com/ilyastar9999/heCsTackForse/internal/db"
 	"github.com/ilyastar9999/heCsTackForse/internal/deployer"
@@ -107,7 +108,6 @@ func main() {
 	}
 
 	mgr := deployer.NewManager()
-	mgr.Register(&deployer.NoopDeployer{})
 	mgr.Register(&deployer.NoDeployDeployer{})
 
 	if cfg.Deployer.Backends.Docker.Enabled {
@@ -140,18 +140,18 @@ func main() {
 		))
 	}
 
-	// Start AD engine if mode is "ad"
+	// Start AD engine (always available; only activates for attack_defence_* challenges)
 	var adEngine *ad.Engine
-	if cfg.CTF.Mode == "ad" {
-		engine, err := ad.New(database, cfg)
-		if err != nil {
-			log.Fatalf("failed to create AD engine: %v", err)
-		}
-		adEngine = engine
-		adEngine.Start()
+	engine, err := ad.New(database, cfg)
+	if err != nil {
+		log.Fatalf("failed to create AD engine: %v", err)
 	}
+	adEngine = engine
+	adEngine.Start()
 
-	srv := api.NewServer(cfg, database, mgr, adEngine)
+	c := cache.New(cfg.Cache.URL, cfg.Cache.Prefix)
+
+	srv := api.NewServer(cfg, database, mgr, adEngine, c)
 	cleanupCtx, cleanupCancel := context.WithCancel(context.Background())
 	defer cleanupCancel()
 	srv.StartInstanceCleanup(cleanupCtx, time.Minute)
@@ -180,6 +180,12 @@ func main() {
 	cleanupCancel()
 	if adEngine != nil {
 		adEngine.Stop()
+	}
+	c.Close()
+	if bridge != nil {
+		if err := bridge.Close(); err != nil {
+			log.Printf("warning: plugin bridge shutdown failed: %v", err)
+		}
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

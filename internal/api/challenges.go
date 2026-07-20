@@ -129,6 +129,13 @@ func (s *Server) handleSubmitFlag(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
 	}
+	req.Flag = strings.TrimSpace(req.Flag)
+	if req.Flag == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "flag is required"})
+	}
+	if len(req.Flag) > 1024 {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "flag too long"})
+	}
 
 	var correctFlag string
 	var challengeName string
@@ -151,7 +158,7 @@ func (s *Server) handleSubmitFlag(c echo.Context) error {
 	if maxAttempts > 0 {
 		var attempts int
 		_ = s.db.QueryRow(
-			"SELECT COUNT(*) FROM submissions WHERE user_id=? AND challenge_id=? AND is_correct=0",
+			"SELECT COUNT(*) FROM submissions WHERE user_id=? AND challenge_id=? AND is_correct=FALSE",
 			userID, id,
 		).Scan(&attempts)
 		if attempts >= maxAttempts {
@@ -193,36 +200,79 @@ func (s *Server) handleSubmitFlag(c echo.Context) error {
 		submission.IsCorrect = ext.Verify(payload, req.Flag)
 	}
 
-	if challengeType != "pentest" {
-		solvedCount, err := s.countSolvedByOwner(id, userID, teamID)
-		if err == nil && solvedCount > 0 {
-			return c.JSON(http.StatusConflict, map[string]string{"error": "already solved"})
-		}
-	} else if submission.IsCorrect && submission.BucketKey != "" {
-		alreadySolved, err := s.bucketAlreadySolved(id, submission.BucketKey, userID, teamID)
-		if err == nil && alreadySolved {
-			return c.JSON(http.StatusConflict, map[string]string{"error": "this pentest bucket is already solved"})
-		}
-	}
-
 	ip := getClientIP(c)
 	var dbTeamID any
 	if teamID > 0 {
 		dbTeamID = teamID
 	}
 
-	if _, err := s.db.Exec(
-		"INSERT INTO submissions (user_id, team_id, challenge_id, bucket_key, awarded_points, flag, is_correct, ip) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-		userID, dbTeamID, id, submission.BucketKey, submission.AwardedPoints, req.Flag, submission.IsCorrect, ip,
-	); err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error recording submission"})
+	err = s.db.Transaction(func(tx *sql.Tx) error {
+		if challengeType != "pentest" {
+			var solvedCount int
+			solveQuery := "SELECT COUNT(*) FROM submissions WHERE challenge_id=? AND is_correct=TRUE"
+			solveArgs := []any{id}
+			if s.cfg.CTF.TeamMode && teamID > 0 {
+				solveQuery += " AND team_id=?"
+				solveArgs = append(solveArgs, teamID)
+			} else {
+				solveQuery += " AND user_id=?"
+				solveArgs = append(solveArgs, userID)
+			}
+			if err := tx.QueryRow(s.db.Rewrite(solveQuery), solveArgs...).Scan(&solvedCount); err != nil {
+				return err
+			}
+			if solvedCount > 0 {
+				return fmt.Errorf("already solved")
+			}
+		} else if submission.IsCorrect && submission.BucketKey != "" {
+			var alreadySolvedCount int
+			bucketQuery := "SELECT COUNT(*) FROM submissions WHERE challenge_id=? AND bucket_key=? AND is_correct=TRUE"
+			bucketArgs := []any{id, submission.BucketKey}
+			if s.cfg.CTF.TeamMode && teamID > 0 {
+				bucketQuery += " AND team_id=?"
+				bucketArgs = append(bucketArgs, teamID)
+			} else {
+				bucketQuery += " AND user_id=?"
+				bucketArgs = append(bucketArgs, userID)
+			}
+			if err := tx.QueryRow(s.db.Rewrite(bucketQuery), bucketArgs...).Scan(&alreadySolvedCount); err != nil {
+				return err
+			}
+			if alreadySolvedCount > 0 {
+				return fmt.Errorf("this pentest bucket is already solved")
+			}
+		}
+		if _, err := tx.Exec(
+			s.db.Rewrite("INSERT INTO submissions (user_id, team_id, challenge_id, bucket_key, awarded_points, flag, is_correct, ip) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"),
+			userID, dbTeamID, id, submission.BucketKey, submission.AwardedPoints, req.Flag, submission.IsCorrect, ip,
+		); err != nil {
+			return err
+		}
+		if submission.IsCorrect {
+			if _, err := tx.Exec(s.db.Rewrite("UPDATE users SET score = score + ? WHERE id = ?"), submission.AwardedPoints, userID); err != nil {
+				return err
+			}
+			if teamID > 0 {
+				if _, err := tx.Exec(s.db.Rewrite("UPDATE teams SET score = score + ? WHERE id = ?"), submission.AwardedPoints, teamID); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		if err.Error() == "already solved" {
+			return c.JSON(http.StatusConflict, map[string]string{"error": "already solved"})
+		}
+		if err.Error() == "this pentest bucket is already solved" {
+			return c.JSON(http.StatusConflict, map[string]string{"error": "this pentest bucket is already solved"})
+		}
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
 	}
 
 	if submission.IsCorrect {
-		_, _ = s.db.Exec("UPDATE users SET score = score + ? WHERE id = ?", submission.AwardedPoints, userID)
-		if teamID > 0 {
-			_, _ = s.db.Exec("UPDATE teams SET score = score + ? WHERE id = ?", submission.AwardedPoints, teamID)
-		}
+		go s.InvalidateScoreboardCache()
+		go s.InvalidateStatisticsCache()
 		go s.notifySolve(userID, challengeName, submission.AwardedPoints, solveCount+1)
 		return c.JSON(http.StatusOK, map[string]any{
 			"correct":      true,
@@ -250,6 +300,9 @@ func (s *Server) handleSubmitAnyFlag(c echo.Context) error {
 	req.Flag = strings.TrimSpace(req.Flag)
 	if req.Flag == "" {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "flag is required"})
+	}
+	if len(req.Flag) > 1024 {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "flag too long"})
 	}
 
 	rows, err := s.db.Query(`
@@ -330,7 +383,7 @@ func (s *Server) handleSubmitAnyFlag(c echo.Context) error {
 		if target.maxAttempts > 0 {
 			var attempts int
 			_ = s.db.QueryRow(
-				"SELECT COUNT(*) FROM submissions WHERE user_id=? AND challenge_id=? AND is_correct=0",
+				"SELECT COUNT(*) FROM submissions WHERE user_id=? AND challenge_id=? AND is_correct=FALSE",
 				userID, target.id,
 			).Scan(&attempts)
 			if attempts >= target.maxAttempts {
@@ -378,6 +431,8 @@ func (s *Server) handleSubmitAnyFlag(c echo.Context) error {
 		if teamID > 0 {
 			_, _ = s.db.Exec("UPDATE teams SET score = score + ? WHERE id = ?", submission.AwardedPoints, teamID)
 		}
+		go s.InvalidateScoreboardCache()
+		go s.InvalidateStatisticsCache()
 		go s.notifySolve(userID, target.name, submission.AwardedPoints, target.solveCount+1)
 		return c.JSON(http.StatusOK, map[string]any{
 			"correct":        true,
@@ -492,7 +547,7 @@ func (s *Server) loadPentestCheckerConfig(rawConfig, fallbackFlag, fallbackType 
 
 func (s *Server) countSolvedByOwner(challengeID, userID, teamID int64) (int, error) {
 	var count int
-	query := "SELECT COUNT(*) FROM submissions WHERE challenge_id=? AND is_correct=1"
+	query := "SELECT COUNT(*) FROM submissions WHERE challenge_id=? AND is_correct=TRUE"
 	args := []any{challengeID}
 	if s.cfg.CTF.TeamMode && teamID > 0 {
 		query += " AND team_id=?"
@@ -507,7 +562,7 @@ func (s *Server) countSolvedByOwner(challengeID, userID, teamID int64) (int, err
 
 func (s *Server) bucketAlreadySolved(challengeID int64, bucketKey string, userID, teamID int64) (bool, error) {
 	var count int
-	query := "SELECT COUNT(*) FROM submissions WHERE challenge_id=? AND bucket_key=? AND is_correct=1"
+	query := "SELECT COUNT(*) FROM submissions WHERE challenge_id=? AND bucket_key=? AND is_correct=TRUE"
 	args := []any{challengeID, bucketKey}
 	if s.cfg.CTF.TeamMode && teamID > 0 {
 		query += " AND team_id=?"
@@ -774,7 +829,7 @@ func (s *Server) handleStartInstance(c echo.Context) error {
 	requestedCPU, requestedMemMB := parseRequestedResources(deployConfig)
 	selected, back, err := s.resolveDeployerSelection(ch.DeployBackend, requestedCPU, requestedMemMB)
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "deployer backend not available: " + err.Error()})
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "deployer backend not available"})
 	}
 	dynamicFlag := ""
 	if ch.ChallengeType == "dynamic_deploy" {
@@ -800,7 +855,7 @@ func (s *Server) handleStartInstance(c echo.Context) error {
 
 	inst, err := back.Deploy(context.Background(), req)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "deploy failed: " + err.Error()})
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "deploy failed"})
 	}
 
 	// Persist instance
@@ -1186,9 +1241,10 @@ func (s *Server) handleAdminCreateChallenge(c echo.Context) error {
 		ch.Name, ch.Description, ch.Category, ch.Points, ch.Flag, ch.ChallengeType, ch.FlagType, ch.CheckerConfig, ch.DeployType, ch.DeployBackend, ch.DeployConfig, ch.Image, ch.VMTemplate, ch.IsVisible, ch.ConnectionInfo, ch.MaxAttempts,
 	)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error: " + err.Error()})
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
 	}
 	ch.ID = id
+	s.InvalidateStatisticsCache()
 	return c.JSON(http.StatusCreated, ch)
 }
 
@@ -1207,9 +1263,10 @@ func (s *Server) handleAdminUpdateChallenge(c echo.Context) error {
 		ch.Name, ch.Description, ch.Category, ch.Points, ch.Flag, ch.ChallengeType, ch.FlagType, ch.CheckerConfig, ch.DeployType, ch.DeployBackend, ch.DeployConfig, ch.Image, ch.VMTemplate, ch.IsVisible, ch.ConnectionInfo, ch.MaxAttempts, id,
 	)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error: " + err.Error()})
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
 	}
 	ch.ID = id
+	s.InvalidateStatisticsCache()
 	return c.JSON(http.StatusOK, ch)
 }
 
@@ -1222,6 +1279,7 @@ func (s *Server) handleAdminDeleteChallenge(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
 	}
+	s.InvalidateStatisticsCache()
 	return c.JSON(http.StatusOK, map[string]string{"message": "deleted"})
 }
 

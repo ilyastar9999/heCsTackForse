@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -20,11 +21,40 @@ import (
 
 func newTestServer(t *testing.T) (*Server, *db.DB) {
 	t.Helper()
-	database, err := db.New("sqlite", filepath.Join(t.TempDir(), "test.db"))
+
+	var driver, dsn string
+	if pgURL := os.Getenv("TEST_DATABASE_URL"); pgURL != "" {
+		driver = "postgres"
+		dsn = pgURL
+	} else {
+		driver = "sqlite"
+		dsn = filepath.Join(t.TempDir(), "test.db")
+	}
+	database, err := db.New(driver, dsn)
 	if err != nil {
-		t.Fatalf("db.New: %v", err)
+		t.Fatalf("db.New(%s): %v", driver, err)
 	}
 	t.Cleanup(func() { _ = database.Close() })
+
+	// Clean all tables so tests don't interfere with each other
+	tables := []string{
+		"submissions", "instances", "ad_sploit_results", "ad_sploits",
+		"ad_flags", "ad_services", "ad_rounds", "ad_vpn_peers",
+		"challenge_flags", "challenge_files", "challenge_hints", "challenge_tags",
+		"challenge_restart_votes", "challenge_restart_events",
+		"pages", "modules", "module_items", "notifications",
+		"team_members", "teams", "user_field_values", "user_fields",
+		"ctf_settings", "challenges", "users",
+	}
+	for _, tbl := range tables {
+		_, _ = database.Exec("DELETE FROM " + tbl)
+	}
+	// Reset sequences so IDs start at 1 (matches SQLite test behavior)
+	if driver == "postgres" {
+		for _, tbl := range tables {
+			_, _ = database.Exec("ALTER SEQUENCE " + tbl + "_id_seq RESTART WITH 1")
+		}
+	}
 
 	cfg := &config.Config{}
 	cfg.Server.SecretKey = "test-secret-key-with-enough-entropy"
@@ -39,7 +69,7 @@ func newTestServer(t *testing.T) (*Server, *db.DB) {
 
 	mgr := deployer.NewManager()
 	mgr.Register(&deployer.NoDeployDeployer{})
-	return NewServer(cfg, database, mgr, nil), database
+	return NewServer(cfg, database, mgr, nil, nil), database
 }
 
 func registerAndCookie(t *testing.T, srv *Server) *http.Cookie {
@@ -199,7 +229,7 @@ func TestInitialSetupCreatesAdminAndPersistsPublicConfig(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &cfg); err != nil {
 		t.Fatalf("decode config: %v", err)
 	}
-	if cfg["name"] != "Final CTF" || cfg["mode"] != "ad" || cfg["language"] != "ru" || cfg["registration_open"] != false || cfg["team_mode"] != true {
+	if cfg["name"] != "Final CTF" || cfg["mode"] != "ctf" || cfg["language"] != "ru" || cfg["registration_open"] != false || cfg["team_mode"] != true {
 		t.Fatalf("unexpected public config: %+v", cfg)
 	}
 
@@ -483,6 +513,7 @@ func TestADCatalogExposesAttackBucketsIncludingLegacyFormat(t *testing.T) {
 func TestChallengeWorkflowForAttackReturnsChallengeScopedSploits(t *testing.T) {
 	srv, database := newTestServer(t)
 	cookie := registerAndCookie(t, srv)
+	attachUserToTeam(t, database, 1, "Red Team")
 
 	challengeID, err := database.InsertGetID(
 		`INSERT INTO challenges (name, description, category, points, flag, challenge_type, flag_type, checker_config, deploy_type, deploy_backend, deploy_config, is_visible)

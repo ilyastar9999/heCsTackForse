@@ -13,6 +13,7 @@ type Config struct {
 	Deployer DeployerConfig     `yaml:"deployer"`
 	AD       ADConfig           `yaml:"ad"`
 	Plugins  PluginBridgeConfig `yaml:"plugins"`
+	Cache    CacheConfig        `yaml:"cache"`
 }
 
 type PluginBridgeConfig struct {
@@ -112,6 +113,16 @@ type VPNConfig struct {
 	HookTimeout     string   `yaml:"hook_timeout"`      // e.g. 15s
 }
 
+type CacheConfig struct {
+	Enabled bool   `yaml:"enabled"`
+	URL     string `yaml:"url"`      // e.g. "valkey://localhost:6379"
+	Prefix  string `yaml:"prefix"`   // key prefix, default "hectackforse:"
+	TTLScoreboard string `yaml:"ttl_scoreboard"` // e.g. "30s"
+	TTLStatistics string `yaml:"ttl_statistics"`  // e.g. "60s"
+	TTLConfig     string `yaml:"ttl_config"`      // e.g. "60s"
+	TTLAD         string `yaml:"ttl_ad"`          // e.g. "5m"
+}
+
 func Load(path string) (*Config, error) {
 	cfg := &Config{}
 	cfg.Server.Host = "0.0.0.0"
@@ -137,6 +148,12 @@ func Load(path string) (*Config, error) {
 	cfg.AD.SploitTimeout = "60s"
 	cfg.AD.SploitDir = "/tmp/sploits"
 	cfg.AD.VPN.HookTimeout = "15s"
+	cfg.Cache.URL = ""
+	cfg.Cache.Prefix = "hectackforse:"
+	cfg.Cache.TTLScoreboard = "30s"
+	cfg.Cache.TTLStatistics = "60s"
+	cfg.Cache.TTLConfig = "60s"
+	cfg.Cache.TTLAD = "5m"
 
 	data, err := os.ReadFile(path)
 	if err != nil {

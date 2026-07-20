@@ -184,11 +184,11 @@ func (s *Server) handleAdminSetDeployConfig(c echo.Context) error {
 			return c.JSON(http.StatusBadRequest, map[string]string{"error": "unsupported deploy target type: " + target.Type})
 		}
 		if err := s.validateDeployTargetConfig(target); err != nil {
-			return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid configuration"})
 		}
 	}
 	if err := s.applyDeploySchedulerConfig(cfg); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid configuration"})
 	}
 	raw, err := json.Marshal(cfg)
 	if err != nil {

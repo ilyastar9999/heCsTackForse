@@ -80,15 +80,9 @@ func (s *Server) notifyAnnouncement(title, content string) {
 	_ = n.Notify(plugin.Event{
 		Type: "announcement",
 		Data: map[string]any{
-			"title":                        title,
-			"content":                      content,
-			"message":                      message,
-			"notifier_type":                settings.str("notifier_type"),
-			"notifier_send_notifications":  settings.bool("notifier_send_notifications"),
-			"notifier_slack_webhook_url":   settings.str("notifier_slack_webhook_url"),
-			"notifier_discord_webhook_url": settings.str("notifier_discord_webhook_url"),
-			"notifier_telegram_bot_token":  settings.str("notifier_telegram_bot_token"),
-			"notifier_telegram_chat_id":    settings.str("notifier_telegram_chat_id"),
+			"title":   title,
+			"content": content,
+			"message": message,
 		},
 	})
 }

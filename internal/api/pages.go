@@ -12,9 +12,9 @@ import (
 )
 
 func (s *Server) handleListPages(c echo.Context) error {
-	query := `SELECT id, title, slug, content, draft, auth_required, created_at, updated_at FROM pages WHERE draft=0`
+	query := `SELECT id, title, slug, content, draft, auth_required, created_at, updated_at FROM pages WHERE draft=FALSE`
 	if _, _, err := s.authenticateRequest(c); err != nil {
-		query += ` AND auth_required=0`
+		query += ` AND auth_required=FALSE`
 	}
 	query += ` ORDER BY id`
 	rows, err := s.db.Query(query)
@@ -39,7 +39,7 @@ func (s *Server) handleListPages(c echo.Context) error {
 func (s *Server) handleGetPage(c echo.Context) error {
 	slug := c.Param("slug")
 	var p models.Page
-	err := s.db.QueryRow(`SELECT id, title, slug, content, draft, auth_required, created_at, updated_at FROM pages WHERE slug=? AND draft=0`, slug).
+	err := s.db.QueryRow(`SELECT id, title, slug, content, draft, auth_required, created_at, updated_at FROM pages WHERE slug=? AND draft=FALSE`, slug).
 		Scan(&p.ID, &p.Title, &p.Slug, &p.Content, &p.Draft, &p.AuthRequired, &p.CreatedAt, &p.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return c.JSON(http.StatusNotFound, map[string]string{"error": "not found"})
@@ -94,7 +94,7 @@ func (s *Server) handleAdminCreatePage(c echo.Context) error {
 		req.Title, req.Slug, req.Content, req.Draft, req.AuthRequired,
 	)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error: " + err.Error()})
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
 	}
 	var p models.Page
 	_ = s.db.QueryRow(`SELECT id, title, slug, content, draft, auth_required, created_at, updated_at FROM pages WHERE id=?`, id).

@@ -29,8 +29,14 @@ func (s *Server) handleRegister(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
 	}
-	if req.Username == "" || req.Email == "" || req.Password == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "username, email, and password are required"})
+	if err := validateUsername(req.Username); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+	}
+	if err := validateEmail(req.Email); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+	}
+	if err := validatePassword(req.Password); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -152,8 +158,8 @@ func (s *Server) handleChangePassword(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
 	}
-	if req.NewPassword == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "new password required"})
+	if err := validatePassword(req.NewPassword); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
 
 	var hash string

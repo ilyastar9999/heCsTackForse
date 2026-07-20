@@ -53,7 +53,7 @@ func (s *Server) handleAdminCreateModule(c echo.Context) error {
 		strings.TrimSpace(req.Title), strings.TrimSpace(req.Slug), req.Description, req.SortOrder, req.Draft,
 	)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error: " + err.Error()})
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
 	}
 	req.ID = id
 	if req.Items == nil {
@@ -79,7 +79,7 @@ func (s *Server) handleAdminUpdateModule(c echo.Context) error {
 		strings.TrimSpace(req.Title), strings.TrimSpace(req.Slug), req.Description, req.SortOrder, req.Draft, time.Now(), id,
 	)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error: " + err.Error()})
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
 	}
 	req.ID = id
 	return c.JSON(http.StatusOK, req)
@@ -110,14 +110,14 @@ func (s *Server) handleAdminCreateModuleItem(c echo.Context) error {
 	}
 	req.ModuleID = moduleID
 	if err := normalizeModuleItem(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
 	}
 	id, err := s.db.InsertGetID(
 		`INSERT INTO module_items (module_id, type, title, content, page_id, challenge_id, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		req.ModuleID, req.Type, req.Title, req.Content, nullableInt64(req.PageID), nullableInt64(req.ChallengeID), req.SortOrder,
 	)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error: " + err.Error()})
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
 	}
 	req.ID = id
 	return c.JSON(http.StatusCreated, req)
@@ -133,14 +133,14 @@ func (s *Server) handleAdminUpdateModuleItem(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
 	}
 	if err := normalizeModuleItem(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
 	}
 	_, err = s.db.Exec(
 		`UPDATE module_items SET type=?, title=?, content=?, page_id=?, challenge_id=?, sort_order=? WHERE id=?`,
 		req.Type, req.Title, req.Content, nullableInt64(req.PageID), nullableInt64(req.ChallengeID), req.SortOrder, id,
 	)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error: " + err.Error()})
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
 	}
 	req.ID = id
 	return c.JSON(http.StatusOK, req)
@@ -162,7 +162,7 @@ func (s *Server) loadModules(includeDraft bool, moduleID int64, slug string) ([]
 	args := []any{}
 	clauses := []string{}
 	if !includeDraft {
-		clauses = append(clauses, `draft=0`)
+		clauses = append(clauses, `draft=FALSE`)
 	}
 	if moduleID > 0 {
 		clauses = append(clauses, `id=?`)
@@ -260,7 +260,7 @@ func (s *Server) loadModuleItems(moduleID int64, includeDraft bool) ([]models.Mo
 func (s *Server) loadModulePage(id int64, includeDraft bool) (models.Page, bool, error) {
 	query := `SELECT id, title, slug, content, draft, auth_required, created_at, updated_at FROM pages WHERE id=?`
 	if !includeDraft {
-		query += ` AND draft=0 AND auth_required=0`
+		query += ` AND draft=FALSE AND auth_required=FALSE`
 	}
 	var p models.Page
 	err := s.db.QueryRow(query, id).Scan(&p.ID, &p.Title, &p.Slug, &p.Content, &p.Draft, &p.AuthRequired, &p.CreatedAt, &p.UpdatedAt)

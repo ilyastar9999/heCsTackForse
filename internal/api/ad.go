@@ -1,18 +1,23 @@
 package api
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo/v4"
 
 	"github.com/ilyastar9999/heCsTackForse/internal/ad"
+	"github.com/ilyastar9999/heCsTackForse/internal/cache"
 	"github.com/ilyastar9999/heCsTackForse/internal/models"
 )
+
+const maxSploitScriptSize = 1 << 20 // 1 MiB
 
 // ────────────────────────────────────────────────────────────────────────────
 // AD status
@@ -36,6 +41,26 @@ func (s *Server) handleADStatus(c echo.Context) error {
 // ────────────────────────────────────────────────────────────────────────────
 
 func (s *Server) handleADScoreboard(c echo.Context) error {
+	ttl := cache.ParseDuration(s.cfg.Cache.TTLAD, 5*time.Second)
+	mode := "team"
+	if !s.cfg.CTF.TeamMode {
+		mode = "user"
+	}
+	cacheKey := cache.Key("ad", "scoreboard", mode)
+
+	type adEntry struct {
+		TeamID     int64  `json:"team_id"`
+		TeamName   string `json:"team_name"`
+		DefencePts int64  `json:"defence_pts"`
+		AttackPts  int64  `json:"attack_pts"`
+		Total      int64  `json:"total"`
+	}
+
+	var board []adEntry
+	if s.cache.Get(context.Background(), cacheKey, &board) {
+		return c.JSON(http.StatusOK, board)
+	}
+
 	query := `
 		SELECT t.id, t.name,
 		       COALESCE(defs.defence_pts, 0)                                  AS defence_pts,
@@ -50,7 +75,7 @@ func (s *Server) handleADScoreboard(c echo.Context) error {
 			SELECT sp.team_id, SUM(sr.awarded_points) AS attack_pts
 			FROM ad_sploit_results sr
 			JOIN ad_sploits sp ON sp.id = sr.sploit_id
-			WHERE sr.flags_submitted > 0
+			WHERE sr.flags_submitted > 0 OR sr.bucket_key = 'all_teams_bonus'
 			GROUP BY sp.team_id
 		) atk ON atk.team_id = t.id
 		ORDER BY (COALESCE(defs.defence_pts, 0) + COALESCE(atk.attack_pts, 0)) DESC
@@ -70,7 +95,7 @@ func (s *Server) handleADScoreboard(c echo.Context) error {
 				SELECT sp.team_id, SUM(sr.awarded_points) AS attack_pts
 				FROM ad_sploit_results sr
 				JOIN ad_sploits sp ON sp.id = sr.sploit_id
-				WHERE sr.flags_submitted > 0
+				WHERE sr.flags_submitted > 0 OR sr.bucket_key = 'all_teams_bonus'
 				GROUP BY sp.team_id
 			) atk ON atk.team_id = u.id
 			ORDER BY (COALESCE(defs.defence_pts, 0) + COALESCE(atk.attack_pts, 0)) DESC
@@ -81,16 +106,8 @@ func (s *Server) handleADScoreboard(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
 	}
 	defer rows.Close()
-	type entry struct {
-		TeamID     int64  `json:"team_id"`
-		TeamName   string `json:"team_name"`
-		DefencePts int64  `json:"defence_pts"`
-		AttackPts  int64  `json:"attack_pts"`
-		Total      int64  `json:"total"`
-	}
-	var board []entry
 	for rows.Next() {
-		var e entry
+		var e adEntry
 		if err := rows.Scan(&e.TeamID, &e.TeamName, &e.DefencePts, &e.AttackPts); err != nil {
 			continue
 		}
@@ -98,8 +115,9 @@ func (s *Server) handleADScoreboard(c echo.Context) error {
 		board = append(board, e)
 	}
 	if board == nil {
-		board = []entry{}
+		board = []adEntry{}
 	}
+	s.cache.Set(context.Background(), cacheKey, board, ttl)
 	return c.JSON(http.StatusOK, board)
 }
 
@@ -230,7 +248,7 @@ func (s *Server) handleADGetVPN(c echo.Context) error {
 
 	peer, teamIP, err := s.ensureADVPNPeer(ownerID, false)
 	if err != nil {
-		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": err.Error()})
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "internal error"})
 	}
 	cfg := s.cfg.AD.VPN
 
@@ -264,7 +282,7 @@ func (s *Server) handleADVPNStatus(c echo.Context) error {
 
 	peer, teamIP, err := s.ensureADVPNPeer(ownerID, false)
 	if err != nil && peer.ID == 0 {
-		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": err.Error()})
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "internal error"})
 	}
 
 	ownerType := "user"
@@ -288,7 +306,7 @@ func (s *Server) handleADVPNStatus(c echo.Context) error {
 		"sync_url":        "/api/ad/vpn/sync",
 	}
 	if err != nil {
-		payload["last_sync_error"] = err.Error()
+		payload["last_sync_error"] = "sync failed"
 	}
 	return c.JSON(http.StatusOK, payload)
 }
@@ -305,7 +323,7 @@ func (s *Server) handleADSyncVPN(c echo.Context) error {
 	peer, teamIP, err := s.ensureADVPNPeer(ownerID, true)
 	if err != nil {
 		return c.JSON(http.StatusServiceUnavailable, map[string]any{
-			"error":       err.Error(),
+			"error":       "internal error",
 			"provisioned": peer.Provisioned,
 			"last_error":  peer.LastSyncError,
 		})
@@ -371,6 +389,9 @@ func (s *Server) handleADCreateSploit(c echo.Context) error {
 	if req.Script == "" || req.Name == "" {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "name and script are required"})
 	}
+	if len(req.Script) > maxSploitScriptSize {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "script exceeds maximum size"})
+	}
 	if req.ChallengeID <= 0 {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "a specific attack challenge must be selected"})
 	}
@@ -378,14 +399,14 @@ func (s *Server) handleADCreateSploit(c echo.Context) error {
 		req.Language = "python3"
 	}
 	if err := s.validateADSploitTarget(req.ChallengeID, req.BucketKey); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
 	}
 	id, err := s.db.InsertGetID(
 		`INSERT INTO ad_sploits (team_id, challenge_id, bucket_key, name, language, script, enabled) VALUES (?,?,?,?,?,?,TRUE)`,
 		teamID, req.ChallengeID, req.BucketKey, req.Name, req.Language, req.Script,
 	)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error: " + err.Error()})
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
 	}
 	return c.JSON(http.StatusCreated, map[string]any{"id": id, "message": "sploit created"})
 }
@@ -439,7 +460,7 @@ func (s *Server) handleADUpdateSploit(c echo.Context) error {
 			bucketKey = strings.TrimSpace(*req.BucketKey)
 		}
 		if err := s.validateADSploitTarget(challengeID, bucketKey); err != nil {
-			return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
 		}
 		_, _ = s.db.Exec(`UPDATE ad_sploits SET challenge_id=?, bucket_key=? WHERE id=?`, challengeID, bucketKey, sploitID)
 	}
@@ -518,6 +539,14 @@ func (s *Server) handleADSubmitFlag(c echo.Context) error {
 	if err := c.Bind(&req); err != nil || len(req.Flags) == 0 {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "provide flags array"})
 	}
+	if len(req.Flags) > 100 {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "too many flags, maximum 100 per request"})
+	}
+	for _, f := range req.Flags {
+		if len(f) > 1024 {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "flag too long"})
+		}
+	}
 	if s.cfg.AD.FlagSubmitURL == "" {
 		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "central flag submitter not configured"})
 	}
@@ -549,7 +578,7 @@ func (s *Server) handleADSubmitFlag(c echo.Context) error {
 	client := &http.Client{}
 	resp, err := client.Do(httpReq)
 	if err != nil {
-		return c.JSON(http.StatusBadGateway, map[string]string{"error": "flag submitter unreachable: " + err.Error()})
+		return c.JSON(http.StatusBadGateway, map[string]string{"error": "flag submitter unreachable"})
 	}
 	defer resp.Body.Close()
 	return c.JSON(http.StatusOK, map[string]any{
@@ -613,6 +642,79 @@ func (s *Server) validateADSploitTarget(challengeID int64, bucketKey string) err
 	return fmt.Errorf("bucket %q is not configured for this challenge", bucketKey)
 }
 
+func (s *Server) handleADListChallengeSploits(c echo.Context) error {
+	challengeID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid id"})
+	}
+	teamID := s.getTeamIDForUser(getUserID(c))
+	if teamID == 0 {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "you must be in a team"})
+	}
+	rows, err := s.db.Query(
+		`SELECT id, team_id, challenge_id, bucket_key, name, language, enabled, created_at, last_run_at
+		 FROM ad_sploits WHERE team_id=? AND challenge_id=? ORDER BY id`,
+		teamID, challengeID,
+	)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
+	}
+	defer rows.Close()
+	var sploits []models.Sploit
+	for rows.Next() {
+		var sp models.Sploit
+		if err := rows.Scan(&sp.ID, &sp.TeamID, &sp.ChallengeID, &sp.BucketKey, &sp.Name,
+			&sp.Language, &sp.Enabled, &sp.CreatedAt, &sp.LastRunAt); err != nil {
+			continue
+		}
+		sploits = append(sploits, sp)
+	}
+	if sploits == nil {
+		sploits = []models.Sploit{}
+	}
+	return c.JSON(http.StatusOK, sploits)
+}
+
+func (s *Server) handleADCreateChallengeSploit(c echo.Context) error {
+	challengeID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid id"})
+	}
+	teamID := s.getTeamIDForUser(getUserID(c))
+	if teamID == 0 {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "you must be in a team"})
+	}
+	var req struct {
+		BucketKey string `json:"bucket_key"`
+		Name      string `json:"name"`
+		Language  string `json:"language"`
+		Script    string `json:"script"`
+	}
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
+	}
+	if req.Script == "" || req.Name == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "name and script are required"})
+	}
+	if len(req.Script) > maxSploitScriptSize {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "script exceeds maximum size"})
+	}
+	if req.Language == "" {
+		req.Language = "python3"
+	}
+	if err := s.validateADSploitTarget(challengeID, req.BucketKey); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
+	}
+	id, err := s.db.InsertGetID(
+		`INSERT INTO ad_sploits (team_id, challenge_id, bucket_key, name, language, script, enabled) VALUES (?,?,?,?,?,?,TRUE)`,
+		teamID, challengeID, req.BucketKey, req.Name, req.Language, req.Script,
+	)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
+	}
+	return c.JSON(http.StatusCreated, map[string]any{"id": id, "message": "sploit created"})
+}
+
 func (s *Server) ensureADVPNPeer(ownerID int64, forceSync bool) (models.VPNPeer, string, error) {
 	if ownerID == 0 {
 		return models.VPNPeer{}, "", fmt.Errorf("VPN owner is not available for this account")
@@ -662,7 +764,7 @@ func (s *Server) ensureADVPNPeer(ownerID int64, forceSync bool) (models.VPNPeer,
 	}
 
 	if peer.AllowedIP != allowedIP {
-		if _, err := s.db.Exec(`UPDATE ad_vpn_peers SET allowed_ip=?, provisioned=0, last_sync_error='', synced_at=NULL WHERE id=?`, allowedIP, peer.ID); err != nil {
+		if _, err := s.db.Exec(`UPDATE ad_vpn_peers SET allowed_ip=?, provisioned=FALSE, last_sync_error='', synced_at=NULL WHERE id=?`, allowedIP, peer.ID); err != nil {
 			return models.VPNPeer{}, "", fmt.Errorf("db error: %w", err)
 		}
 		peer.AllowedIP = allowedIP
@@ -674,18 +776,25 @@ func (s *Server) ensureADVPNPeer(ownerID int64, forceSync bool) (models.VPNPeer,
 	if !peer.Provisioned || forceSync {
 		if err := ad.RunVPNHook(s.cfg.AD.VPN, "provision", peer, teamIP); err != nil {
 			peer.Provisioned = false
-			peer.LastSyncError = err.Error()
+			peer.LastSyncError = "sync failed"
 			peer.SyncedAt = nil
-			_, _ = s.db.Exec(`UPDATE ad_vpn_peers SET provisioned=0, last_sync_error=?, synced_at=NULL WHERE id=?`, peer.LastSyncError, peer.ID)
+			_, _ = s.db.Exec(`UPDATE ad_vpn_peers SET provisioned=FALSE, last_sync_error=?, synced_at=NULL WHERE id=?`, peer.LastSyncError, peer.ID)
 			return peer, teamIP, err
 		}
 		peer.Provisioned = true
 		peer.LastSyncError = ""
-		_, _ = s.db.Exec(`UPDATE ad_vpn_peers SET provisioned=1, last_sync_error='', synced_at=CURRENT_TIMESTAMP WHERE id=?`, peer.ID)
+		_, _ = s.db.Exec(`UPDATE ad_vpn_peers SET provisioned=TRUE, last_sync_error='', synced_at=CURRENT_TIMESTAMP WHERE id=?`, peer.ID)
 		if scanErr := s.db.QueryRow(`SELECT synced_at FROM ad_vpn_peers WHERE id=?`, peer.ID).Scan(&peer.SyncedAt); scanErr != nil {
 			peer.SyncedAt = nil
 		}
 	}
 
 	return peer, teamIP, nil
+}
+
+// InvalidateADCache removes cached AD scoreboard and services data.
+func (s *Server) InvalidateADCache() {
+	if s.cache != nil {
+		s.cache.InvalidatePrefix(context.Background(), "ad:*")
+	}
 }

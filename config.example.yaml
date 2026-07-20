@@ -72,3 +72,11 @@ plugins:
   plugin_dirs:
     - ./python/ctfd_plugins
   modules: []
+
+cache:
+  url: ""                    # e.g. "redis://localhost:6379" or "valkey://localhost:6379"
+  prefix: "hectackforse:"
+  ttl_scoreboard: 30s        # user/team scoreboard cache TTL
+  ttl_statistics: 60s        # task category statistics cache TTL
+  ttl_config: 60s            # CTF config cache TTL
+  ttl_ad: 5m                 # AD scoreboard cache TTL

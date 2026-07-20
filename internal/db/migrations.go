@@ -322,6 +322,10 @@ var sqliteMigrations = []string{
 	`ALTER TABLE ad_vpn_peers ADD COLUMN last_sync_error TEXT NOT NULL DEFAULT ''`,
 	`ALTER TABLE ad_vpn_peers ADD COLUMN synced_at DATETIME`,
 	`ALTER TABLE module_items ADD COLUMN content TEXT NOT NULL DEFAULT ''`,
+	// Per-challenge AD rounds
+	`ALTER TABLE ad_rounds ADD COLUMN challenge_id INTEGER NOT NULL DEFAULT 0`,
+	// Per-signature exploit results on ad_services
+	`ALTER TABLE ad_services ADD COLUMN exploit_results TEXT NOT NULL DEFAULT ''`,
 }
 
 // postgresMigrations uses PostgreSQL types (BIGSERIAL, TIMESTAMPTZ, BOOLEAN).
@@ -613,4 +617,8 @@ var postgresMigrations = []string{
 	`ALTER TABLE ad_vpn_peers ADD COLUMN IF NOT EXISTS last_sync_error TEXT NOT NULL DEFAULT ''`,
 	`ALTER TABLE ad_vpn_peers ADD COLUMN IF NOT EXISTS synced_at TIMESTAMPTZ`,
 	`ALTER TABLE module_items ADD COLUMN IF NOT EXISTS content TEXT NOT NULL DEFAULT ''`,
+	// Per-challenge AD rounds
+	`ALTER TABLE ad_rounds ADD COLUMN IF NOT EXISTS challenge_id BIGINT NOT NULL DEFAULT 0`,
+	// Per-signature exploit results on ad_services
+	`ALTER TABLE ad_services ADD COLUMN IF NOT EXISTS exploit_results TEXT NOT NULL DEFAULT ''`,
 }
